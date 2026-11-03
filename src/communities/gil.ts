@@ -91,7 +91,7 @@ export default defineCommunity({
         role: '담당 목사',
         name: '이준건 목사',
         note: '사랑합니다! 청년4부를 담당하고 있는 이준건 목사입니다. 청년들과 함께 하나님을 사랑하는 GIL 공동체로 초대합니다.',
-        photo: '',
+        photo: 'gil-pastor.jpg', // public/images/ 안의 파일
         featured: true,
       },
       {
