@@ -3,34 +3,34 @@ import { shortDate, qtUrl, type Qt } from '../lib/qt';
 interface Props { qt: Qt }
 const { qt } = Astro.props;
 ---
-<a class="item" href={qtUrl(qt)}>
+<a class="row" href={qtUrl(qt)}>
   <span class="date">{shortDate(qt.data.date)}</span>
   <span class="body">
     <span class="title">{qt.data.title}</span>
-    <span class="meta">{qt.data.passage} · {qt.data.preacher}</span>
+    <span class="meta">{qt.data.passage}</span>
   </span>
-  <span class="arrow" aria-hidden="true">›</span>
+  <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 </a>
 
 <style>
-  .item {
+  .row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 16px 4px;
-    border-bottom: 1px solid var(--line);
+    padding: 14px 18px;
     text-decoration: none;
   }
-  .date {
-    flex: none;
-    width: 52px;
-    font-weight: 800;
-    font-size: .95rem;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
+  .row + .row::before,
+  :global(.row) + .row::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 18px; right: 0;
+    border-top: 0.5px solid var(--line);
   }
+  .row:active { background: var(--surface-2); }
+  .date { flex: none; width: 44px; font-size: .9rem; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
   .body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .title { font-weight: 700; line-height: 1.45; }
+  .title { font-weight: 600; line-height: 1.4; }
   .meta { font-size: .85rem; color: var(--muted); }
-  .arrow { color: var(--muted); font-size: 1.4rem; }
 </style>

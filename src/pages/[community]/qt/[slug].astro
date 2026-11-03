@@ -30,7 +30,8 @@ const { title, passage, preacher, date, summary } = qt.data;
       <p class="passage">{passage}</p>
       <p class="muted preacher">설교 · {preacher}</p>
       <button class="btn ghost share" type="button" data-share>
-        <span aria-hidden="true">↗</span> 공유하기
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
+        <span data-share-label>공유</span>
       </button>
     </header>
 
@@ -40,19 +41,21 @@ const { title, passage, preacher, date, summary } = qt.data;
     <FormButton community={community} />
   </article>
 
-  <nav class="pager" aria-label="다른 주 큐티">
-    {older ? (
-      <a href={qtUrl(older)} class="card">
-        <span class="muted">← 지난 주</span><strong>{older.data.title}</strong>
+  <nav class="pager group" aria-label="다른 주 큐티">
+    {newer && (
+      <a href={qtUrl(newer)}>
+        <span class="dir">다음 주</span><span class="t">{newer.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
-    ) : <span />}
-    {newer ? (
-      <a href={qtUrl(newer)} class="card right">
-        <span class="muted">다음 주 →</span><strong>{newer.data.title}</strong>
+    )}
+    {older && (
+      <a href={qtUrl(older)}>
+        <span class="dir">지난 주</span><span class="t">{older.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
-    ) : <span />}
+    )}
+    <a href={`/${community.slug}/qt`}>
+      <span class="dir">목록</span><span class="t">큐티 전체 보기</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
   </nav>
-  <p class="center"><a href={`/${community.slug}/qt`} class="btn ghost">큐티 전체 목록</a></p>
 </BaseLayout>
 
 <script>
@@ -63,88 +66,87 @@ const { title, passage, preacher, date, summary } = qt.data;
       try {
         if (navigator.share) return await navigator.share(data);
         await navigator.clipboard.writeText(location.href);
-        btn.textContent = '주소가 복사됐어요 ✓';
+        const label = btn.querySelector('[data-share-label]');
+        if (label) label.textContent = '주소 복사됨';
       } catch { /* 사용자가 취소함 */ }
     });
   });
 </script>
 
 <style>
-  .qt-head { padding: 8px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
-  .qt-head h1 { margin: 6px 0 4px; }
-  .passage { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--warm); }
-  .preacher { margin: 2px 0 16px; font-size: .9rem; }
-  .share { min-height: 40px; padding: 0 16px; font-size: .88rem; }
+  .qt-head { padding: 12px 0 24px; }
+  .qt-head h1 { margin: 6px 0 6px; font-size: 2rem; }
+  .passage { margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--accent); }
+  .preacher { margin: 2px 0 18px; font-size: .9rem; }
+  .share { min-height: 38px; padding: 0 16px; font-size: .88rem; }
+  .share svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ── 마크다운 본문 스타일 ── */
+  /* ── 마크다운 본문 ── */
+  .prose { font-size: 1.04rem; line-height: 1.8; }
   .prose :global(h2) {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 36px 0 12px;
-    font-size: 1.15rem;
-  }
-  .prose :global(h2::before) {
-    content: '';
-    width: 4px; height: 1.1em;
-    border-radius: 2px;
-    background: var(--accent);
+    margin: 44px 0 12px;
+    font-size: .82rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--muted);
   }
   .prose :global(p) { margin: 0 0 1em; }
-  .prose :global(strong) { color: var(--text); font-weight: 700; }
+  .prose :global(strong) { font-weight: 700; }
 
-  /* 성경 본문 (> 로 쓴 부분) */
+  /* 성경 본문 */
   .prose :global(blockquote) {
     margin: 0 0 1em;
-    padding: 18px 18px 6px;
-    border-radius: 14px;
-    background: var(--warm-soft);
-    font-size: 1.02rem;
-    line-height: 1.85;
+    padding: 20px 20px 8px;
+    border-radius: var(--radius);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    border: 0.5px solid var(--glass-edge);
+    box-shadow: var(--glass-shadow);
+    font-size: 1.08rem;
+    line-height: 1.9;
   }
-  .prose :global(blockquote p) { margin: 0 0 .7em; }
-  .prose :global(blockquote sup),
-  .prose :global(blockquote b),
-  .prose :global(blockquote strong) { color: var(--warm); font-weight: 800; margin-right: 2px; }
+  .prose :global(blockquote p) { margin: 0 0 .75em; }
+  .prose :global(blockquote sup) { font-size: .7em; font-weight: 700; color: var(--accent); margin-right: 3px; }
 
-  /* 질문 목록 (1. 2. 3.) */
+  /* 질문 */
   .prose :global(ol) {
     list-style: none;
     counter-reset: q;
-    padding: 0;
     margin: 0 0 1em;
-    display: grid;
-    gap: 10px;
+    padding: 0;
+    border-radius: var(--radius);
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--blur);
+    backdrop-filter: var(--blur);
+    border: 0.5px solid var(--glass-edge);
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
   }
   .prose :global(ol > li) {
     counter-increment: q;
     position: relative;
-    padding: 14px 16px 14px 50px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 14px;
+    padding: 16px 18px 16px 50px;
+    line-height: 1.65;
   }
+  .prose :global(ol > li + li) { border-top: 0.5px solid var(--line); }
   .prose :global(ol > li::before) {
     content: counter(q);
     position: absolute;
-    left: 14px; top: 14px;
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    background: var(--accent-soft);
+    left: 18px; top: 16px;
+    font-weight: 700;
     color: var(--accent);
-    font-size: .8rem;
-    font-weight: 800;
-    display: grid;
-    place-items: center;
-    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
   .prose :global(ul) { padding-left: 1.2em; margin: 0 0 1em; }
   .prose :global(ul > li) { margin-bottom: .4em; }
-  .prose :global(hr) { border: 0; border-top: 1px dashed var(--line); margin: 32px 0; }
+  .prose :global(ul > li::marker) { color: var(--faint); }
+  .prose :global(hr) { border: 0; border-top: 0.5px solid var(--line); margin: 32px 0; }
 
-  .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 48px; }
-  .pager a { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; text-decoration: none; font-size: .9rem; }
-  .pager .right { text-align: right; }
-  .pager strong { line-height: 1.4; }
-  .center { text-align: center; margin-top: 24px; }
+  .pager { margin-top: 48px; }
+  .pager a { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; }
+  .pager a + a { border-top: 0.5px solid var(--line); }
+  .pager a:active { background: var(--surface-2); }
+  .dir { flex: none; width: 52px; font-size: .82rem; font-weight: 600; color: var(--muted); }
+  .t { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

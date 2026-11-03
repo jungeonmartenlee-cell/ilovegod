@@ -6,13 +6,13 @@ const form = Astro.props.community.form;
 ---
 {form?.url && (
   <div class="form-cta">
-    <a class="btn" href={form.url} target="_blank" rel="noopener">{form.label}</a>
+    <a class="btn ghost" href={form.url} target="_blank" rel="noopener">{form.label}</a>
     {form.note && <p class="muted">{form.note}</p>}
   </div>
 )}
 
 <style>
   .form-cta { margin-top: 16px; text-align: center; }
-  .form-cta .btn { width: 100%; background: var(--warm); }
+  .form-cta .btn { width: 100%; }
   .form-cta p { margin: 6px 0 0; font-size: .82rem; }
 </style>

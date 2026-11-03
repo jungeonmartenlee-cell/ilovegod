@@ -1,0 +1,59 @@
+---
+// 화면 아래에 떠 있는 유리 탭 바 (공동체 페이지에서만)
+import type { CommunityEntry } from '../communities';
+
+interface Props { community: CommunityEntry }
+const { community } = Astro.props;
+const base = `/${community.slug}`;
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const tabs = [
+  { href: base, label: '홈', icon: 'M3.5 10.2 12 3.5l8.5 6.7V20a1 1 0 0 1-1 1h-5v-6h-5v6h-5a1 1 0 0 1-1-1z' },
+  { href: `${base}/qt`, label: '큐티', icon: 'M4 5.5C6.5 4 9.5 4 12 5.8 14.5 4 17.5 4 20 5.5V19c-2.5-1.4-5.5-1.4-8 .4-2.5-1.8-5.5-1.8-8-.4zM12 5.8v13.6' },
+  { href: `${base}/about`, label: '소개', icon: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm-7.5 8.5c.6-3.6 3.6-6 7.5-6s6.9 2.4 7.5 6' },
+];
+const active = (href: string) => (href === base ? path === base : path.startsWith(href));
+---
+<nav class="tabbar" aria-label="메뉴">
+  {tabs.map((t) => (
+    <a href={t.href} aria-current={active(t.href) ? 'page' : undefined}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.icon} /></svg>
+      <span>{t.label}</span>
+    </a>
+  ))}
+</nav>
+
+<style>
+  .tabbar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    gap: 2px;
+    padding: 5px;
+    border-radius: 999px;
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(28px) saturate(200%);
+    backdrop-filter: blur(28px) saturate(200%);
+    border: 0.5px solid var(--glass-edge);
+    box-shadow: 0 0.5px 0 rgba(255,255,255,.9) inset, 0 12px 32px rgba(20, 20, 50, 0.16);
+  }
+  a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 76px;
+    padding: 7px 0 6px;
+    border-radius: 999px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: .68rem;
+    font-weight: 600;
+    transition: background .2s ease, color .2s ease;
+  }
+  svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; stroke-linecap: round; }
+  a[aria-current='page'] { color: var(--accent); background: var(--accent-soft); }
+  a[aria-current='page'] svg { stroke-width: 2; }
+</style>

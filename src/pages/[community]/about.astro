@@ -17,7 +17,6 @@ const others = shown.filter((p) => !p.featured);
 const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(mapQuery)}` : '';
 ---
 <BaseLayout community={community} title="공동체 소개" description={`${mainName} 소개 · 예배 안내 · 소그룹 안내`}>
-  <span class="eyebrow">ABOUT</span>
   <h1>우리는 {mainName}입니다</h1>
   {parentNames && <p class="parents">{parentNames}</p>}
   <p class="muted lead">{intro} {attendance}</p>
@@ -80,7 +79,7 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
   {activities && (
     <section>
       <h2 class="section-title">공동체 활동</h2>
-      <ul class="acts">
+      <ul class="group acts">
         {activities.items.map((a) => <li>{a}</li>)}
       </ul>
       {activities.programs?.map((pr) => (
@@ -130,9 +129,9 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
         </div>
       ))}
       {others.length > 0 && (
-        <ul class="people">
+        <ul class="group people">
           {others.map((p) => (
-            <li class="card">
+            <li>
               <span class="role">{p.role}</span>
               {p.name && <strong>{p.name}</strong>}
               {p.note && <span class="muted note">{p.note}</span>}
@@ -169,84 +168,90 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
 </BaseLayout>
 
 <style>
-  .parents { margin: -4px 0 12px; font-size: .8rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
-  .lead { margin: 0; }
+  h1 { margin-top: 12px; }
+  .parents { margin: -2px 0 14px; font-size: .7rem; font-weight: 600; letter-spacing: .16em; color: var(--faint); }
+  .lead { margin: 0; font-size: 1.02rem; line-height: 1.75; }
   ul, ol { list-style: none; margin: 0; padding: 0; }
-  .role { font-size: .78rem; font-weight: 700; color: var(--warm); }
+  .role { font-size: .78rem; font-weight: 600; color: var(--muted); }
 
-  .meaning { text-align: center; }
-  .subtitle { margin: 0 0 8px; font-weight: 800; font-size: 1.15rem; color: var(--accent); }
-  .verse { margin: 0 0 16px; font-weight: 700; font-size: 1.05rem; }
-  .verse cite { display: block; font-style: normal; font-size: .82rem; color: var(--warm); }
-  .points { display: grid; gap: 8px; }
-  .points li { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: .95rem; line-height: 1.5; }
+  /* GIL 이란? */
+  .meaning { padding: 26px 20px 8px; text-align: center; }
+  .subtitle { margin: 0 0 6px; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.03em; color: var(--accent); }
+  .verse { margin: 0 0 18px; font-size: 1rem; font-weight: 600; }
+  .verse cite { display: block; margin-top: 2px; font-style: normal; font-size: .8rem; font-weight: 500; color: var(--faint); }
+  .points li { padding: 14px 4px; border-top: 0.5px solid var(--line); font-size: .97rem; line-height: 1.5; }
+  .points li strong { font-weight: 600; }
   .points li span { display: block; font-size: .88rem; }
 
-  .mascot { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
-  .mascot-img { flex: none; width: 76px; height: auto; }
+  .mascot { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+  .mascot-img { flex: none; width: 64px; height: auto; }
   .mascot strong { display: block; font-size: 1.05rem; }
   .mascot p { margin: 2px 0 0; font-size: .9rem; line-height: 1.55; }
 
-  .info { margin: 0 0 10px; display: grid; gap: 10px; }
-  .info div { display: grid; grid-template-columns: 44px 1fr; gap: 8px; }
-  .info dt { font-weight: 800; color: var(--accent); }
+  /* 예배 안내 */
+  .info { margin: 0 0 10px; display: grid; gap: 12px; }
+  .info div { display: grid; grid-template-columns: 44px 1fr; gap: 8px; line-height: 1.55; }
+  .info dt { font-size: .88rem; font-weight: 600; color: var(--muted); padding-top: 1px; }
   .info dd { margin: 0; }
-  .map { margin-top: 4px; min-height: 44px; font-size: .9rem; }
+  .map { margin-top: 6px; min-height: 42px; font-size: .9rem; }
 
-  .body { margin: 0 0 14px; line-height: 1.75; }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+  /* 소그룹 */
+  .body { margin: 0 0 16px; line-height: 1.75; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
   .steps li {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 12px 6px; border-radius: 12px; background: var(--accent-soft);
-    font-size: .82rem; font-weight: 700; text-align: center; line-height: 1.35;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 14px 6px; border-radius: 18px;
+    background: var(--glass); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+    border: 0.5px solid var(--glass-edge); box-shadow: var(--glass-shadow);
+    font-size: .82rem; font-weight: 600; text-align: center; line-height: 1.35;
   }
-  .step-num {
-    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--accent); color: var(--surface); font-size: .78rem;
-  }
+  .step-num { font-size: 1.1rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
   .notes { display: grid; gap: 8px; }
-  .notes li { position: relative; padding-left: 16px; font-size: .93rem; line-height: 1.65; }
-  .notes li::before { content: '•'; position: absolute; left: 2px; color: var(--accent); font-weight: 800; }
+  .notes li { position: relative; padding-left: 14px; font-size: .95rem; line-height: 1.7; }
+  .notes li::before { content: ''; position: absolute; left: 2px; top: .72em; width: 4px; height: 4px; border-radius: 50%; background: var(--faint); }
 
-  .org { text-align: center; }
-  .org-title { margin: 0 0 14px; font-weight: 800; font-size: 1.05rem; }
-  .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-  .groups li { display: flex; flex-direction: column; gap: 2px; padding: 12px 4px; border-radius: 12px; background: var(--surface-2); }
-  .groups li.on { background: var(--accent-soft); outline: 2px solid var(--accent); }
-  .groups strong { font-size: 1.2rem; }
-  .groups .muted { font-size: .72rem; line-height: 1.4; }
-  .children { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 6px; font-size: .72rem; color: var(--muted); }
-  .children .current { color: var(--surface); background: var(--accent); border-radius: 6px; padding: 0 5px; font-weight: 800; }
-  .org-note { margin: 14px 0 0; font-size: .9rem; font-weight: 600; }
-
-  .pastor { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px 16px; margin-bottom: 10px; }
-  .pastor.has-photo { display: flex; flex-direction: column; align-items: stretch; padding-top: 12px; }
-  .pastor img { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; border-radius: 12px; background: var(--surface-2); }
-  .pastor.has-photo .pastor-text { align-items: center; text-align: center; }
-  .pastor.has-photo .pastor-note { text-align: center; }
-  .pastor-text { display: flex; flex-direction: column; }
-  .pastor strong { font-size: 1.15rem; }
-  .pastor-note { grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size: .95rem; line-height: 1.7; }
-  .people { display: grid; gap: 10px; }
-  .people li { display: flex; flex-direction: column; padding: 16px 18px; }
-  .people strong { font-size: 1.05rem; }
-  .note { margin-top: 4px; font-size: .9rem; line-height: 1.65; }
-
-  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-  .acts li { padding: 12px; border-radius: 12px; background: var(--surface-2); font-size: .88rem; font-weight: 600; line-height: 1.45; }
-  .program { margin-top: 10px; }
+  /* 활동 */
+  .acts li { padding: 14px 18px; font-size: .97rem; font-weight: 500; }
+  .acts li + li { border-top: 0.5px solid var(--line); }
+  .program { margin-top: 12px; }
   .program strong { font-size: 1.02rem; }
-  .program p { margin: 4px 0 8px; font-size: .92rem; line-height: 1.65; }
+  .program p { margin: 4px 0 8px; font-size: .94rem; line-height: 1.7; }
 
-  .closing { margin-top: 40px; padding: 28px 8px 8px; text-align: center; border-top: 1px solid var(--line); }
-  .closing-title { margin: 0 0 10px; font-weight: 800; letter-spacing: .08em; color: var(--warm); }
-  .closing-text { margin: 0 0 14px; font-size: 1.05rem; font-weight: 700; line-height: 1.7; }
-  .closing-verse { margin: 0; font-size: .9rem; color: var(--muted); }
-  .closing-verse cite { display: block; font-style: normal; font-size: .8rem; }
+  /* 소속 */
+  .org { text-align: center; }
+  .org-title { margin: 0 0 14px; font-weight: 700; }
+  .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .groups li { display: flex; flex-direction: column; gap: 2px; padding: 12px 4px; border-radius: 16px; background: var(--surface-2); }
+  .groups li.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .groups strong { font-size: 1.2rem; }
+  .groups .muted { font-size: .7rem; line-height: 1.4; }
+  .children { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 6px; font-size: .7rem; color: var(--muted); }
+  .children .current { color: var(--accent); font-weight: 800; }
+  .org-note { margin: 14px 0 0; font-size: .9rem; color: var(--muted); }
 
-  .meetings li { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  /* 사람들 */
+  .pastor { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px 16px; margin-bottom: 12px; }
+  .pastor.has-photo { display: flex; flex-direction: column; align-items: stretch; padding-top: 14px; }
+  .pastor img { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; border-radius: 16px; background: var(--surface-2); }
+  .pastor-text { display: flex; flex-direction: column; }
+  .pastor.has-photo .pastor-text { align-items: center; text-align: center; }
+  .pastor strong { font-size: 1.25rem; letter-spacing: -0.03em; }
+  .pastor-note { grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 0.5px solid var(--line); font-size: .97rem; line-height: 1.75; }
+  .pastor.has-photo .pastor-note { text-align: center; }
+  .people li { display: flex; flex-direction: column; padding: 16px 18px; }
+  .people li + li { border-top: 0.5px solid var(--line); }
+  .people strong { font-size: 1.05rem; }
+  .note { margin-top: 4px; font-size: .92rem; line-height: 1.7; }
+
+  .meetings li { padding: 14px 0; border-bottom: 0.5px solid var(--line); }
   .meetings p { margin: 2px 0 0; font-size: .93rem; line-height: 1.6; }
 
-  .welcome { margin-top: 28px; background: var(--accent-soft); border-color: transparent; box-shadow: none; }
-  .welcome p { margin: 4px 0 0; font-size: .93rem; }
+  .welcome { margin-top: 32px; }
+  .welcome p { margin: 4px 0 0; font-size: .94rem; line-height: 1.7; }
+
+  .closing { margin: 56px 0 8px; text-align: center; }
+  .closing-title { margin: 0 0 10px; font-size: .78rem; font-weight: 700; letter-spacing: .2em; color: var(--accent); }
+  .closing-text { margin: 0 auto 16px; max-width: 22em; font-size: 1.2rem; font-weight: 700; line-height: 1.6; letter-spacing: -0.03em; }
+  .closing-verse { margin: 0; font-size: .9rem; color: var(--muted); }
+  .closing-verse cite { display: block; font-style: normal; font-size: .8rem; color: var(--faint); }
 </style>

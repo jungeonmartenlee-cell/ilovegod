@@ -11,24 +11,20 @@ const contact = community?.contact ?? {};
     {community && <p class="names">{community.namesLine}</p>}
     {(contact.instagram || contact.kakao) && (
       <p class="links">
-        {contact.instagram && <a href={`https://instagram.com/${contact.instagram}`}>인스타그램</a>}
+        {contact.instagram && <a href={`https://instagram.com/${contact.instagram}`}>Instagram</a>}
         {contact.kakao && <a href={contact.kakao}>카카오톡</a>}
       </p>
     )}
-    <p class="brand"><a href="/">♡ {BRAND}</a></p>
+    <p class="brand"><a href="/">{BRAND}</a></p>
   </div>
 </footer>
 
 <style>
-  footer {
-    border-top: 1px solid var(--line);
-    padding: 24px 0 calc(32px + env(safe-area-inset-bottom));
-    font-size: .85rem;
-    color: var(--muted);
-  }
+  footer { padding: 8px 0 calc(28px + var(--tabbar) + env(safe-area-inset-bottom)); font-size: .78rem; color: var(--faint); }
+  .container { border-top: 0.5px solid var(--line); padding-top: 20px; }
   p { margin: 0 0 4px; }
-  .names { font-weight: 700; letter-spacing: .12em; }
+  .names { font-weight: 600; letter-spacing: .14em; }
+  .links { display: flex; gap: 14px; }
+  .links a { color: var(--muted); }
   .brand a { text-decoration: none; }
-  .brand { margin-top: 14px; font-size: .8rem; font-weight: 600; color: var(--warm); letter-spacing: .02em; }
-  .links { display: flex; gap: 14px; margin-top: 8px; }
 </style>
