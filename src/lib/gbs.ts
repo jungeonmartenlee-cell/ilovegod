@@ -27,3 +27,23 @@ export function shortDate(d: Date): string {
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${m}.${day}`;
 }
+
+/** 나눔방에서 쓸 질문 목록 — GBS 자료의 '마음 열기 / 말씀 나눔 / 삶 나눔' 번호 목록에서 뽑아요 */
+export interface RoomQuestion { id: string; section: string; num: number; text: string }
+const QUESTION_SECTIONS = ['마음 열기', '말씀 나눔', '삶 나눔'];
+export function extractQuestions(body: string): RoomQuestion[] {
+  const out: RoomQuestion[] = [];
+  let section = '';
+  for (const raw of body.split('\n')) {
+    const line = raw.trim();
+    const h = line.match(/^##\s+(.+)/);
+    if (h) { section = h[1].trim(); continue; }
+    const q = line.match(/^(\d+)\.\s+(.+)/);
+    if (q && QUESTION_SECTIONS.includes(section)) {
+      const text = q[2].replace(/\*\*/g, '').trim();
+      out.push({ id: `${QUESTION_SECTIONS.indexOf(section)}-${q[1]}`, section, num: Number(q[1]), text });
+    }
+  }
+  out.push({ id: 'pray', section: '함께 기도', num: 0, text: '서로의 기도제목을 나누고 함께 기도해요' });
+  return out;
+}

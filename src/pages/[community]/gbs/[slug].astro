@@ -29,10 +29,13 @@ const { title, passage, preacher, date, summary } = gbs.data;
       <h1>{title}</h1>
       <p class="passage">{passage}</p>
       <p class="muted preacher">설교 · {preacher}</p>
+      <div class="head-actions">
+      <a class="btn open-room" href={`${gbsUrl(gbs)}/share`}>소그룹 나눔 열기</a>
       <button class="btn ghost share" type="button" data-share>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
         <span data-share-label>공유</span>
       </button>
+      </div>
     </header>
 
     <div class="prose">
@@ -78,6 +81,8 @@ const { title, passage, preacher, date, summary } = gbs.data;
   .gbs-head h1 { margin: 6px 0 6px; font-size: 2.1rem; }
   .passage { margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--accent); }
   .preacher { margin: 2px 0 18px; font-size: .9rem; }
+  .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .open-room { min-height: 38px; padding: 0 18px; font-size: .88rem; }
   .share { min-height: 38px; padding: 0 16px; font-size: .88rem; }
   .share svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 

@@ -1,0 +1,448 @@
+---
+// 소그룹 나눔방 — 주소: /공동체/gbs/날짜/share
+// 리더가 방을 열고 QR을 보여 주면, 조원들이 찍고 들어와 함께 나눠요.
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import { getSortedGbs, gbsSlug, extractQuestions, type Gbs } from '../../../../lib/gbs';
+import { communities, type CommunityEntry } from '../../../../communities';
+
+export async function getStaticPaths() {
+  const paths = [];
+  for (const community of communities) {
+    for (const gbs of await getSortedGbs(community.slug)) {
+      paths.push({ params: { community: community.slug, slug: gbsSlug(gbs) }, props: { community, gbs } });
+    }
+  }
+  return paths;
+}
+interface Props { community: CommunityEntry; gbs: Gbs }
+const { community, gbs } = Astro.props;
+const questions = extractQuestions(gbs.body ?? '');
+const data = {
+  key: `${community.slug}/${gbsSlug(gbs)}`,
+  title: gbs.data.title,
+  passage: gbs.data.passage,
+  questions,
+};
+---
+<BaseLayout community={community} title={`소그룹 나눔 · ${gbs.data.title}`} bare>
+  <script type="application/json" id="room-data" set:html={JSON.stringify(data)} />
+
+  <!-- ① 리더: 나눔방 열기 -->
+  <section class="screen" data-screen="start" hidden>
+    <a class="back" href={`/${community.slug}/gbs/${gbsSlug(gbs)}`}>‹ GBS 자료</a>
+    <h1>소그룹 나눔</h1>
+    <p class="muted lead">{gbs.data.title} · {gbs.data.passage}</p>
+
+    <form class="card form" data-start>
+      <strong class="form-title">리더라면, 나눔방을 열어 주세요</strong>
+      <label>소그룹 이름<input name="group" placeholder="예: 3순" required maxlength="12" /></label>
+      <label>리더 비밀번호<input name="pin" type="password" inputmode="numeric" placeholder="숫자 4자리" required maxlength="8" /></label>
+      <p class="hint">시안에서는 아무 숫자나 넣어도 돼요.</p>
+      <button class="btn full" type="submit">나눔방 열기</button>
+    </form>
+
+    <div class="card join-guide">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2" /></svg>
+      <p><strong>조원이라면</strong><br />리더 휴대폰에 뜬 QR코드를 카메라로 찍어 들어오세요.</p>
+    </div>
+  </section>
+
+  <!-- ② 리더: QR 보여 주기 -->
+  <section class="screen" data-screen="qr" hidden>
+    <p class="eyebrow center" data-group-label></p>
+    <h1 class="center">QR을 찍어 들어오세요</h1>
+    <div class="card qr-card">
+      <div class="qr" data-qr></div>
+      <p class="code">방 코드 <strong data-code></strong></p>
+    </div>
+    <p class="center muted" data-member-count>아직 들어온 사람이 없어요</p>
+    <button class="btn full" type="button" data-go-room>나눔 시작하기</button>
+  </section>
+
+  <!-- ③ 조원: 이름 넣고 입장 -->
+  <section class="screen" data-screen="join" hidden>
+    <p class="eyebrow center" data-group-label></p>
+    <h1 class="center">나눔방에 들어가기</h1>
+    <p class="center muted lead">{gbs.data.title} · {gbs.data.passage}</p>
+    <form class="card form" data-join>
+      <label>이름<input name="name" placeholder="이름 또는 별명" required maxlength="10" autocomplete="nickname" /></label>
+      <button class="btn full" type="submit">들어가기</button>
+    </form>
+    <p class="privacy">나눔 내용은 이 소그룹만 볼 수 있고, <strong>오늘 자정에 자동으로 지워져요.</strong></p>
+  </section>
+
+  <!-- ④ 나눔 화면 -->
+  <section class="room" data-screen="room" hidden>
+    <header class="room-bar">
+      <div>
+        <strong data-group-label></strong>
+        <span class="muted" data-member-line></span>
+      </div>
+      <button class="chip" type="button" data-toggle-pray>기도제목 <span data-pray-count>0</span></button>
+    </header>
+
+    <div class="now glass" data-now>
+      <span class="now-label">지금 나누는 질문</span>
+      <span class="now-section" data-now-section></span>
+      <p class="now-text" data-now-text></p>
+      <div class="leader-tools" data-leader-only hidden>
+        <button class="btn ghost small" type="button" data-prev>이전</button>
+        <button class="btn ghost small" type="button" data-pick>질문 고르기</button>
+        <button class="btn small" type="button" data-next>다음 질문</button>
+      </div>
+    </div>
+
+    <p class="tip">말로 먼저 나누고, 기억하고 싶은 한 줄이나 기도제목만 남겨요.</p>
+
+    <ol class="thread" data-thread></ol>
+
+    <form class="composer" data-send>
+      <button class="pray-toggle" type="button" data-pray-on aria-pressed="false" title="기도제목으로 남기기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>
+      </button>
+      <textarea name="text" rows="1" placeholder="한 줄 나눔 남기기" maxlength="300"></textarea>
+      <button class="send" type="submit" aria-label="보내기">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+      </button>
+    </form>
+
+    <!-- 질문 고르기 (리더) -->
+    <div class="sheet" data-sheet hidden>
+      <div class="sheet-panel">
+        <div class="sheet-head"><strong>질문 고르기</strong><button type="button" class="chip" data-sheet-close>닫기</button></div>
+        <ul class="q-list" data-q-list></ul>
+        <button class="btn ghost full end" type="button" data-close-room>나눔 마치기</button>
+      </div>
+    </div>
+
+    <!-- 기도제목 모아보기 -->
+    <div class="sheet" data-pray-sheet hidden>
+      <div class="sheet-panel">
+        <div class="sheet-head"><strong>오늘의 기도제목</strong><button type="button" class="chip" data-pray-close>닫기</button></div>
+        <ul class="pray-list" data-pray-list></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 마침 -->
+  <section class="screen" data-screen="closed" hidden>
+    <h1 class="center">오늘 나눔을 마쳤어요</h1>
+    <p class="center muted lead">함께 나눈 기도제목으로 한 주 동안 서로를 위해 기도해요.</p>
+    <ul class="card pray-list" data-pray-final></ul>
+    <a class="btn full" href={`/${community.slug}`}>처음으로</a>
+  </section>
+</BaseLayout>
+
+<script>
+  import QRCode from 'qrcode';
+  import { LocalStore, type RoomState, type RoomMessage } from '../../../../lib/room-store';
+  import type { RoomQuestion } from '../../../../lib/gbs';
+
+  const data = JSON.parse(document.getElementById('room-data')!.textContent!) as {
+    key: string; title: string; passage: string; questions: RoomQuestion[];
+  };
+  const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector(sel) as T;
+  const $$ = (sel: string) => Array.from(document.querySelectorAll<HTMLElement>(sel));
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const params = new URLSearchParams(location.search);
+  const demo = params.get('demo');
+  let room = params.get('room') || '';
+  const meKey = () => `gbsme:${data.key}:${room}`;
+  const loadMe = (): { name?: string; leader?: boolean } => { try { return JSON.parse(localStorage.getItem(meKey()) || '{}'); } catch { return {}; } };
+  const saveMe = (m: object) => { try { localStorage.setItem(meKey(), JSON.stringify(m)); } catch { /* 무시 */ } };
+  let store: LocalStore | null = null;
+  let me = loadMe();
+  let prayOn = false;
+
+  const groupOf = (code: string) => code.split('-').slice(0, -1).join('-') || code;
+  const show = (name: string) => $$('[data-screen]').forEach((s) => (s.hidden = s.dataset.screen !== name));
+  const setGroupLabels = () => $$('[data-group-label]').forEach((el) => (el.textContent = `${groupOf(room)} 나눔방`));
+  const openStore = () => { store = new LocalStore(`${data.key}:${room}`, data.questions[0]?.id ?? 'pray'); return store; };
+  const qOf = (id: string) => data.questions.find((q) => q.id === id) ?? data.questions[0];
+  const label = (q: RoomQuestion) => (q.num ? `${q.section} ${q.num}` : q.section);
+
+  // ── 화면 ①: 리더가 방 열기
+  $('[data-start]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target as HTMLFormElement);
+    const group = String(f.get('group')).trim().replace(/\s+/g, '');
+    room = `${group}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    history.replaceState(null, '', `?room=${encodeURIComponent(room)}`);
+    me = { name: `${group} 리더`, leader: true };
+    saveMe(me);
+    openStore().join(me.name!);
+    showQr();
+  });
+
+  // ── 화면 ②: QR
+  async function showQr() {
+    setGroupLabels();
+    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;
+    $('[data-qr]').innerHTML = await QRCode.toString(url, { type: 'svg', margin: 0, color: { dark: '#1d1d1f', light: '#ffffff00' } });
+    $('[data-code]').textContent = room;
+    store!.subscribe((s) => {
+      const n = s.members.length - 1;
+      $('[data-member-count]').textContent = n > 0 ? `${n}명이 들어왔어요` : '아직 들어온 사람이 없어요';
+    });
+    show('qr');
+  }
+  $('[data-go-room]').addEventListener('click', () => enterRoom());
+
+  // ── 화면 ③: 조원 입장
+  $('[data-join]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = String(new FormData(e.target as HTMLFormElement).get('name')).trim();
+    if (!name) return;
+    me = { name, leader: false };
+    saveMe(me);
+    store!.join(name);
+    enterRoom();
+  });
+
+  // ── 화면 ④: 나눔
+  function bubble(m: RoomMessage, mine: boolean, leader: boolean) {
+    return `<li class="msg ${mine ? 'mine' : ''} ${m.prayer ? 'prayer' : ''}" data-id="${m.id}">
+      ${mine ? '' : `<span class="who">${esc(m.name)}</span>`}
+      <div class="bubble">${m.prayer ? '<span class="tag">기도제목</span>' : ''}${esc(m.text)}</div>
+      ${leader && !mine ? '<button class="del" type="button" data-del>지우기</button>' : ''}
+    </li>`;
+  }
+  function render(s: RoomState) {
+    if (s.closed) return renderClosed(s);
+    const q = qOf(s.current);
+    $('[data-now-section]').textContent = label(q);
+    $('[data-now-text]').textContent = q.text;
+    $('[data-member-line]').textContent = ` · ${s.members.length}명`;
+    const list = s.messages.filter((m) => m.q === s.current);
+    const thread = $('[data-thread]');
+    thread.innerHTML = list.length
+      ? list.map((m) => bubble(m, m.name === me.name, !!me.leader)).join('')
+      : '<li class="empty">아직 남긴 글이 없어요</li>';
+    const prayers = s.messages.filter((m) => m.prayer);
+    $('[data-pray-count]').textContent = String(prayers.length);
+    $('[data-pray-list]').innerHTML = prayers.length
+      ? prayers.map((m) => `<li><strong>${esc(m.name)}</strong>${esc(m.text)}</li>`).join('')
+      : '<li class="empty">아직 기도제목이 없어요</li>';
+    $('[data-q-list]').innerHTML = data.questions.map((qq) =>
+      `<li><button type="button" class="${qq.id === s.current ? 'on' : ''}" data-q="${qq.id}"><span>${label(qq)}</span>${esc(qq.text)}</button></li>`).join('');
+    thread.scrollIntoView({ block: 'end' });
+  }
+  function renderClosed(s: RoomState) {
+    const prayers = s.messages.filter((m) => m.prayer);
+    $('[data-pray-final]').innerHTML = prayers.length
+      ? prayers.map((m) => `<li><strong>${esc(m.name)}</strong>${esc(m.text)}</li>`).join('')
+      : '<li class="empty">남긴 기도제목이 없어요</li>';
+    show('closed');
+  }
+  function enterRoom() {
+    setGroupLabels();
+    $$('[data-leader-only]').forEach((el) => (el.hidden = !me.leader));
+    store!.subscribe(render);
+    show('room');
+  }
+
+  $('[data-send]').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ta = $<HTMLTextAreaElement>('[data-send] textarea');
+    const text = ta.value.trim();
+    if (!text || !store) return;
+    store.send({ name: me.name!, text, q: store.get().current, prayer: prayOn });
+    ta.value = ''; ta.style.height = '';
+    setPray(false);
+  });
+  $<HTMLTextAreaElement>('[data-send] textarea').addEventListener('input', (e) => {
+    const t = e.target as HTMLTextAreaElement; t.style.height = ''; t.style.height = `${Math.min(t.scrollHeight, 120)}px`;
+  });
+  const setPray = (on: boolean) => {
+    prayOn = on;
+    const b = $('[data-pray-on]'); b.setAttribute('aria-pressed', String(on));
+    $<HTMLTextAreaElement>('[data-send] textarea').placeholder = on ? '기도제목 남기기' : '한 줄 나눔 남기기';
+  };
+  $('[data-pray-on]').addEventListener('click', () => setPray(!prayOn));
+
+  // 리더 도구
+  const step = (d: number) => {
+    const i = data.questions.findIndex((q) => q.id === store!.get().current);
+    const n = data.questions[Math.max(0, Math.min(data.questions.length - 1, i + d))];
+    store!.setCurrent(n.id);
+  };
+  $('[data-next]').addEventListener('click', () => step(1));
+  $('[data-prev]').addEventListener('click', () => step(-1));
+  $('[data-pick]').addEventListener('click', () => ($('[data-sheet]').hidden = false));
+  $('[data-sheet-close]').addEventListener('click', () => ($('[data-sheet]').hidden = true));
+  $('[data-q-list]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-q]');
+    if (b) { store!.setCurrent(b.dataset.q!); $('[data-sheet]').hidden = true; }
+  });
+  $('[data-close-room]').addEventListener('click', () => { if (confirm('나눔을 마칠까요? 모두의 화면에서 방이 닫혀요.')) store!.close(); });
+  $('[data-thread]').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('[data-del]');
+    const li = b?.closest<HTMLElement>('[data-id]');
+    if (li && confirm('이 글을 지울까요?')) store!.remove(li.dataset.id!);
+  });
+  $('[data-toggle-pray]').addEventListener('click', () => ($('[data-pray-sheet]').hidden = false));
+  $('[data-pray-close]').addEventListener('click', () => ($('[data-pray-sheet]').hidden = true));
+
+  // ── 시안 미리보기용 예시 데이터
+  function seedDemo() {
+    room = '3순-K7QX';
+    const s = openStore();
+    const q = data.questions;
+    const t = Date.now();
+    s.seed({
+      current: q[2]?.id ?? q[0].id, closed: false, openedAt: t,
+      members: ['3순 리더', '김하은', '이도윤', '박서연', '최민준'],
+      messages: [
+        { id: 'a', name: '김하은', text: '요즘 바쁘다는 핑계로 기도 시간이 거의 없었어요. 붙어 있는 게 먼저라는 말씀이 찔렸어요.', q: q[2]?.id, prayer: false, at: t },
+        { id: 'b', name: '이도윤', text: '열매를 만들려고 애쓰던 제 모습이 떠올랐어요', q: q[2]?.id, prayer: false, at: t },
+        { id: 'c', name: '3순 리더', text: '"거하라"는 머무는 것! 이번 주 하루 10분 같이 해봐요', q: q[2]?.id, prayer: false, at: t },
+        { id: 'd', name: '박서연', text: '다음 주 면접이 있어요. 결과보다 주님께 붙어 있는 마음을 지키도록 기도해 주세요', q: q[2]?.id, prayer: true, at: t },
+        { id: 'e', name: '최민준', text: '가족의 건강을 위해 기도 부탁드려요', q: 'pray', prayer: true, at: t },
+      ],
+    } as RoomState);
+    return s;
+  }
+
+  // ── 시작
+  if (demo) {
+    seedDemo();
+    me = demo === 'leader' || demo === 'qr' ? { name: '3순 리더', leader: true } : { name: '김하은', leader: false };
+    if (demo === 'qr') showQr();
+    else if (demo === 'join') { setGroupLabels(); show('join'); }
+    else if (demo === 'start') show('start');
+    else if (demo === 'pray') { enterRoom(); $('[data-pray-sheet]').hidden = false; }
+    else if (demo === 'pick') { enterRoom(); $('[data-sheet]').hidden = false; }
+    else enterRoom();
+  } else if (room) {
+    openStore();
+    if (me.name) enterRoom(); else { setGroupLabels(); show('join'); }
+  } else {
+    show('start');
+  }
+</script>
+
+<style is:global>
+  body.bare main { padding-bottom: 0; }
+  [data-screen][hidden], .sheet[hidden] { display: none !important; }
+
+  .screen { padding: 8px 0 40px; }
+  .back { display: inline-block; margin: 4px 0 12px; color: var(--accent); font-weight: 600; text-decoration: none; }
+  .center { text-align: center; }
+  h1 { margin: 6px 0 6px; font-size: 1.9rem; }
+  .lead { margin: 0 0 24px; }
+  .eyebrow.center { display: block; color: var(--accent); }
+
+  .form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  .form-title { font-size: 1.1rem; }
+  label { display: grid; gap: 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+  input {
+    width: 100%; min-width: 0;
+    font: inherit; font-size: 1.05rem; color: var(--text);
+    padding: 13px 16px; border-radius: 14px;
+    border: 0.5px solid var(--line); background: var(--surface-2);
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); background: var(--card); }
+  .hint { margin: -6px 0 0; font-size: .8rem; color: var(--faint); }
+  .btn.full { width: 100%; }
+  .join-guide { display: flex; gap: 14px; align-items: center; }
+  .join-guide svg { flex: none; width: 34px; height: 34px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; }
+  .join-guide p { margin: 0; font-size: .95rem; line-height: 1.6; color: var(--muted); }
+  .join-guide strong { color: var(--text); }
+
+  .qr-card { margin: 18px auto 16px; max-width: 320px; text-align: center; padding: 28px; }
+  .qr svg { width: 100%; height: auto; display: block; }
+  .code { margin: 16px 0 0; font-size: .9rem; color: var(--muted); }
+  .code strong { color: var(--text); letter-spacing: .04em; }
+  .privacy { margin: 4px 8px; font-size: .85rem; line-height: 1.6; color: var(--muted); text-align: center; }
+
+  /* ── 나눔 화면 */
+  .room { display: flex; flex-direction: column; min-height: calc(100dvh - 54px); padding-bottom: 96px; }
+  .room-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0 12px; }
+  .room-bar strong { font-size: 1.15rem; letter-spacing: -0.03em; }
+  .room-bar .muted { font-size: .85rem; }
+  .chip {
+    font: inherit; font-size: .82rem; font-weight: 600; color: var(--text);
+    padding: 7px 12px; border-radius: 999px; border: 0.5px solid var(--line); background: var(--card); cursor: pointer;
+  }
+  .chip span { color: var(--accent); }
+
+  .now {
+    position: sticky; top: 62px; z-index: 5;
+    padding: 16px 18px; border-radius: 24px;
+    background: color-mix(in srgb, var(--card) 86%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    border: 0.5px solid var(--line);
+    box-shadow: 0 0 0 2px var(--accent-soft), 0 10px 30px rgba(0,0,0,.06);
+  }
+  .now-label { display: block; font-size: .75rem; font-weight: 700; color: var(--accent); }
+  .now-section { display: block; margin-top: 2px; font-size: .82rem; font-weight: 600; color: var(--muted); }
+  .now-text { margin: 4px 0 0; font-size: 1.12rem; font-weight: 700; line-height: 1.5; letter-spacing: -0.03em; }
+  .leader-tools { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; margin-top: 12px; }
+  .btn.small { min-height: 36px; padding: 0 14px; font-size: .84rem; }
+
+  .tip { margin: 14px 4px 6px; font-size: .8rem; color: var(--faint); text-align: center; }
+
+  .thread { list-style: none; margin: 0; padding: 8px 0; display: flex; flex-direction: column; gap: 10px; }
+  .msg { display: flex; flex-direction: column; align-items: flex-start; max-width: 82%; }
+  .msg.mine { align-self: flex-end; align-items: flex-end; }
+  .who { margin: 0 0 3px 12px; font-size: .75rem; font-weight: 600; color: var(--muted); }
+  .bubble {
+    padding: 10px 14px; border-radius: 20px; font-size: .97rem; line-height: 1.5;
+    background: var(--card); border: 0.5px solid var(--line);
+  }
+  .mine .bubble { background: var(--accent); color: #fff; border-color: transparent; }
+  .tag { display: block; margin-bottom: 2px; font-size: .7rem; font-weight: 700; color: var(--accent); }
+  .mine .tag { color: rgba(255,255,255,.85); }
+  .prayer:not(.mine) .bubble { box-shadow: inset 0 0 0 1.5px var(--accent-soft); }
+  .del { margin: 3px 12px 0; font: inherit; font-size: .72rem; color: var(--faint); background: none; border: 0; cursor: pointer; }
+  .empty { align-self: center; padding: 20px; font-size: .88rem; color: var(--faint); list-style: none; }
+
+  .composer {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: min(calc(100% - 24px), 616px);
+    display: flex; align-items: flex-end; gap: 8px;
+    padding: 6px;
+    border-radius: 28px;
+    background: color-mix(in srgb, var(--card) 80%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(190%); backdrop-filter: blur(22px) saturate(190%);
+    border: 0.5px solid var(--line);
+    box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+  textarea {
+    flex: 1; resize: none; font: inherit; font-size: 1rem; line-height: 1.4; color: var(--text);
+    padding: 9px 4px; border: 0; background: transparent; outline: none; max-height: 120px;
+  }
+  .pray-toggle, .send {
+    flex: none; width: 40px; height: 40px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
+  }
+  .pray-toggle { background: var(--surface-2); color: var(--faint); }
+  .pray-toggle[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+  .pray-toggle svg { width: 20px; height: 20px; fill: currentColor; }
+  .send { background: var(--accent); color: #fff; }
+  .send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  .sheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; background: rgba(0,0,0,.28); }
+  .sheet[hidden] { display: none; }
+  .sheet-panel {
+    width: 100%; max-width: 640px; margin: 0 auto; max-height: 80vh; overflow: auto;
+    padding: 18px 18px calc(20px + env(safe-area-inset-bottom));
+    border-radius: 28px 28px 0 0; background: var(--bg);
+  }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .sheet-head strong { font-size: 1.2rem; }
+  .q-list, .pray-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .q-list button {
+    width: 100%; text-align: left; font: inherit; font-size: .95rem; line-height: 1.5; color: var(--text);
+    padding: 12px 14px; border-radius: 16px; border: 0.5px solid var(--line); background: var(--card); cursor: pointer;
+  }
+  .q-list button span { display: block; font-size: .75rem; font-weight: 600; color: var(--muted); }
+  .q-list button.on { box-shadow: inset 0 0 0 2px var(--accent); }
+  .q-list button.on span { color: var(--accent); }
+  .end { margin-top: 16px; color: #d33; }
+  .pray-list li { padding: 12px 14px; border-radius: 16px; background: var(--card); border: 0.5px solid var(--line); font-size: .95rem; line-height: 1.55; }
+  .pray-list strong { display: block; font-size: .78rem; color: var(--accent); }
+  .card.pray-list { padding: 12px; margin: 0 0 16px; }
+  .card.pray-list li { border: 0; background: var(--surface-2); }
+</style>
