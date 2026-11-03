@@ -1,0 +1,13 @@
+# Netlify 배포 설정 — 수정하지 않아도 돼요.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# QR 고정 주소(/qt/latest)는 항상 새로 받아오도록 (캐시 방지)
+[[headers]]
+  for = "/qt/latest/*"
+  [headers.values]
+    Cache-Control = "no-cache"
