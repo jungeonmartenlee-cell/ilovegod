@@ -1,6 +1,7 @@
 ---
 import { render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import FormButton from '../../components/FormButton.astro';
 import { getSortedQt, formatDate, type Qt } from '../../lib/qt';
 
 export async function getStaticPaths() {
@@ -31,6 +32,7 @@ const { title, passage, preacher, date, summary } = qt.data;
     <div class="prose">
       <Content />
     </div>
+    <FormButton />
   </article>
 
   <nav class="pager" aria-label="다른 주 큐티">

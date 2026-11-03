@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import QtListItem from '../components/QtListItem.astro';
+import FormButton from '../components/FormButton.astro';
 import { SITE, WORSHIP } from '../config';
 import { getSortedQt, formatDate } from '../lib/qt';
 
@@ -21,6 +22,7 @@ const recent = qts.slice(1, 4);
   ) : (
     <div class="card muted">아직 올라온 큐티가 없어요.</div>
   )}
+  <FormButton />
 
   <section class="intro">
     <span class="eyebrow">{SITE.church}</span>

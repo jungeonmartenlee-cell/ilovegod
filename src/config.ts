@@ -19,3 +19,11 @@ export const CONTACT = {
   instagram: '', // 예: 'youth4_official' (없으면 비워 두세요)
   kakao: '',     // 카카오톡 오픈채팅/채널 주소 (없으면 비워 두세요)
 };
+
+// 구글 설문지 연결 버튼 (이름·소그룹 받기)
+// url에 설문지 주소를 붙여 넣으면 홈과 큐티 페이지에 버튼이 나타나요. 비워 두면 숨겨져요.
+export const FORM = {
+  url: '',                              // 예: 'https://forms.gle/xxxxxxxx'
+  label: '이번 주 출석·나눔 체크하기',  // 버튼 글자
+  note: '이름과 소그룹만 입력하면 돼요.', // 버튼 아래 작은 안내
+};

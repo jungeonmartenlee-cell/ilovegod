@@ -1,0 +1,15 @@
+---
+import { FORM } from '../config';
+---
+{FORM.url && (
+  <div class="form-cta">
+    <a class="btn" href={FORM.url} target="_blank" rel="noopener">{FORM.label}</a>
+    {FORM.note && <p class="muted">{FORM.note}</p>}
+  </div>
+)}
+
+<style>
+  .form-cta { margin-top: 16px; text-align: center; }
+  .form-cta .btn { width: 100%; background: var(--warm); }
+  .form-cta p { margin: 6px 0 0; font-size: .82rem; }
+</style>
