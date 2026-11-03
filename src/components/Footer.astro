@@ -1,17 +1,21 @@
 ---
-import { CONTACT, BRAND } from '../config';
-import { namesLine } from '../lib/site';
+import { BRAND } from '../config';
+import type { CommunityEntry } from '../communities';
+
+interface Props { community?: CommunityEntry }
+const { community } = Astro.props;
+const contact = community?.contact ?? {};
 ---
 <footer>
   <div class="container">
-    <p class="names">{namesLine}</p>
-    {(CONTACT.instagram || CONTACT.kakao) && (
+    {community && <p class="names">{community.namesLine}</p>}
+    {(contact.instagram || contact.kakao) && (
       <p class="links">
-        {CONTACT.instagram && <a href={`https://instagram.com/${CONTACT.instagram}`}>인스타그램</a>}
-        {CONTACT.kakao && <a href={CONTACT.kakao}>카카오톡</a>}
+        {contact.instagram && <a href={`https://instagram.com/${contact.instagram}`}>인스타그램</a>}
+        {contact.kakao && <a href={contact.kakao}>카카오톡</a>}
       </p>
     )}
-    {BRAND && <p class="brand">♡ {BRAND}</p>}
+    <p class="brand"><a href="/">♡ {BRAND}</a></p>
   </div>
 </footer>
 
@@ -24,6 +28,7 @@ import { namesLine } from '../lib/site';
   }
   p { margin: 0 0 4px; }
   .names { font-weight: 700; letter-spacing: .12em; }
+  .brand a { text-decoration: none; }
   .brand { margin-top: 14px; font-size: .8rem; font-weight: 600; color: var(--warm); letter-spacing: .02em; }
   .links { display: flex; gap: 14px; margin-top: 8px; }
 </style>

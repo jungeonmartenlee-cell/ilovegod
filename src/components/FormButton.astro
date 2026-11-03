@@ -1,10 +1,13 @@
 ---
-import { FORM } from '../config';
+import type { CommunityEntry } from '../communities';
+
+interface Props { community: CommunityEntry }
+const form = Astro.props.community.form;
 ---
-{FORM.url && (
+{form?.url && (
   <div class="form-cta">
-    <a class="btn" href={FORM.url} target="_blank" rel="noopener">{FORM.label}</a>
-    {FORM.note && <p class="muted">{FORM.note}</p>}
+    <a class="btn" href={form.url} target="_blank" rel="noopener">{form.label}</a>
+    {form.note && <p class="muted">{form.note}</p>}
   </div>
 )}
 

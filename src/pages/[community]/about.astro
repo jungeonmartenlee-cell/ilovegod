@@ -1,16 +1,22 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE, WORSHIP, ABOUT } from '../config';
-import { mainName, parentNames } from '../lib/site';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { communities, type CommunityEntry } from '../../communities';
 
-// 이 페이지의 문구는 src/config.ts 의 ABOUT 에서 바꿔요.
-const { vision, people, meetings, welcome } = ABOUT;
+export function getStaticPaths() {
+  return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
+}
+const { community } = Astro.props as { community: CommunityEntry };
+const base = `/${community.slug}`;
+
+// 이 페이지의 문구는 src/communities/공동체이름.ts 의 about 에서 바꿔요.
+const { mainName, parentNames, intro, attendance, worship } = community;
+const { vision, people, meetings, welcome } = community.about;
 ---
-<BaseLayout title="공동체 소개" description={`${mainName} 비전, 섬기는 사람들, 모임 안내`}>
+<BaseLayout community={community} title="공동체 소개" description={`${mainName} 비전, 섬기는 사람들, 모임 안내`}>
   <span class="eyebrow">ABOUT</span>
   <h1>우리는 {mainName}입니다</h1>
   {parentNames && <p class="parents">{parentNames}</p>}
-  <p class="muted lead">{SITE.intro} {SITE.attendance}</p>
+  <p class="muted lead">{intro} {attendance}</p>
 
   <h2 class="section-title">비전</h2>
   <blockquote class="verse">
@@ -32,7 +38,7 @@ const { vision, people, meetings, welcome } = ABOUT;
       <li class="card">
         <span class="role">{p.role}</span>
         <strong>{p.name}</strong>
-        <span class="muted note">{p.note}</span>
+        {p.note && <span class="muted note">{p.note}</span>}
       </li>
     ))}
   </ul>
@@ -46,15 +52,17 @@ const { vision, people, meetings, welcome } = ABOUT;
 
   <h2 class="section-title">시간 · 장소</h2>
   <div class="card times">
-    {WORSHIP.map((w) => (
+    {worship.map((w) => (
       <p><span class="role">{w.label}</span><br /><strong>{w.time}</strong> · {w.place}</p>
     ))}
   </div>
 
-  <div class="card welcome">
-    <strong>{welcome.title}</strong>
-    <p class="muted">{welcome.text}</p>
-  </div>
+  {welcome && (
+    <div class="card welcome">
+      <strong>{welcome.title}</strong>
+      <p class="muted">{welcome.text}</p>
+    </div>
+  )}
 </BaseLayout>
 
 <style>

@@ -1,113 +1,66 @@
 ---
+// 메인 페이지 — 하나님을사랑합니다 소개 + 공동체 목록
+// 문구는 src/config.ts 의 MAIN 에서 바꿔요. 공동체는 src/communities/ 에 파일을 추가하면 자동으로 나타나요.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import QtListItem from '../components/QtListItem.astro';
-import FormButton from '../components/FormButton.astro';
-import { SITE, WORSHIP } from '../config';
-import { mainName, parentNames } from '../lib/site';
+import { BRAND, MAIN } from '../config';
+import { communities } from '../communities';
 import { getSortedQt, formatDate } from '../lib/qt';
 
-const qts = await getSortedQt();
-const latest = qts[0];
-const recent = qts.slice(1, 4);
+const cards = await Promise.all(
+  communities.map(async (c) => ({ c, latest: (await getSortedQt(c.slug))[0] })),
+);
 ---
 <BaseLayout>
-  {latest ? (
-    <a class="qt-hero" href={`/qt/${latest.id}`}>
-      <span class="badge">이번 주 큐티</span>
-      <h1>{latest.data.title}</h1>
-      <p class="passage">{latest.data.passage}</p>
-      <p class="meta">{formatDate(latest.data.date)} · {latest.data.preacher}</p>
-      {latest.data.summary && <p class="summary">{latest.data.summary}</p>}
-      <span class="go">묵상 시작하기 →</span>
-    </a>
-  ) : (
-    <div class="card muted">아직 올라온 큐티가 없어요.</div>
-  )}
-  <FormButton />
-
-  <section class="intro">
-    {parentNames && <span class="eyebrow names">{parentNames}</span>}
-    <h2>{mainName} — {SITE.tagline}</h2>
-    <p class="muted">{SITE.intro}</p>
-    <a href="/about" class="btn ghost">공동체 소개 보기</a>
+  <section class="hero">
+    <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/>
+    </svg>
+    <h1>{BRAND}</h1>
+    <p class="tagline">{MAIN.tagline}</p>
+    <p class="muted">{MAIN.intro}</p>
   </section>
 
-  <h2 class="section-title">예배 · 모임 안내</h2>
-  <ul class="worship">
-    {WORSHIP.map((w) => (
-      <li class="card">
-        <span class="label">{w.label}</span>
-        <strong>{w.time}</strong>
-        <span class="muted">{w.place}</span>
+  <h2 class="section-title">공동체</h2>
+  <ul class="list">
+    {cards.map(({ c, latest }) => (
+      <li>
+        <a class="card community" href={`/${c.slug}`}>
+          <span class="names">{c.parentNames}</span>
+          <strong class="name">{c.mainName}</strong>
+          <span class="muted tag">{c.tagline}</span>
+          {latest && (
+            <span class="latest">
+              <span class="label">이번 주 큐티</span>
+              {latest.data.title} · {latest.data.passage}
+              <span class="date">{formatDate(latest.data.date)}</span>
+            </span>
+          )}
+          <span class="go">들어가기 →</span>
+        </a>
       </li>
     ))}
   </ul>
-
-  {recent.length > 0 && (
-    <>
-      <h2 class="section-title">지난 큐티</h2>
-      <div>{recent.map((qt) => <QtListItem qt={qt} />)}</div>
-      <p><a href="/qt" class="more">전체 목록 보기 →</a></p>
-    </>
-  )}
 </BaseLayout>
 
 <style>
-  .qt-hero {
-    display: block;
-    position: relative;
-    padding: 26px 22px 22px;
-    border-radius: 24px;
-    background: linear-gradient(150deg, var(--accent) 0%, #3f5a36 100%);
-    color: #fff;
-    text-decoration: none;
-    box-shadow: 0 10px 30px rgba(63, 90, 54, .25);
-    overflow: hidden;
-  }
-  .qt-hero::after {
-    content: '';
-    position: absolute;
-    right: -40px; top: -40px;
-    width: 160px; height: 160px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.08);
-  }
-  @media (prefers-color-scheme: dark) {
-    .qt-hero { background: linear-gradient(150deg, #3f5a36 0%, #2b3f25 100%); box-shadow: none; }
-  }
-  .badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.18);
-    font-size: .78rem;
-    font-weight: 700;
-  }
-  .qt-hero h1 { margin: 14px 0 6px; font-size: 1.55rem; color: #fff; }
-  .passage { margin: 0; font-weight: 700; font-size: 1.05rem; opacity: .95; }
-  .meta { margin: 2px 0 0; font-size: .85rem; opacity: .8; }
-  .summary { margin: 14px 0 0; font-size: .95rem; opacity: .92; line-height: 1.6; }
-  .go {
-    display: inline-block;
-    margin-top: 18px;
-    padding: 10px 16px;
-    border-radius: 999px;
-    background: #fff;
-    color: #3f5a36;
-    font-weight: 800;
-    font-size: .92rem;
-  }
+  .hero { text-align: center; padding: 28px 0 8px; }
+  .mark { width: 44px; height: 44px; fill: var(--warm); }
+  .hero h1 { margin: 10px 0 6px; font-size: 1.8rem; letter-spacing: -0.04em; }
+  .tagline { margin: 0 0 12px; font-weight: 700; color: var(--accent); }
+  .hero .muted { margin: 0 auto; max-width: 30em; font-size: .95rem; }
 
-  .intro { margin-top: 36px; }
-  .names { letter-spacing: .12em; }
-  .intro h2 { margin: 4px 0 8px; }
-  .intro p { margin: 0 0 16px; }
-
-  .worship { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .worship li { display: flex; flex-direction: column; padding: 16px 18px; }
-  .label { font-size: .8rem; font-weight: 700; color: var(--warm); }
-  .worship strong { font-size: 1.05rem; }
-  .worship .muted { font-size: .9rem; }
-
-  .more { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 700; text-decoration: none; }
+  .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .community { display: flex; flex-direction: column; text-decoration: none; }
+  .names { font-size: .72rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
+  .name { font-size: 1.5rem; font-weight: 800; letter-spacing: .02em; line-height: 1.3; }
+  .tag { font-size: .92rem; }
+  .latest {
+    display: flex; flex-direction: column;
+    margin-top: 14px; padding: 12px 14px;
+    border-radius: 12px; background: var(--accent-soft);
+    font-weight: 700; font-size: .95rem; line-height: 1.5;
+  }
+  .latest .label { font-size: .75rem; color: var(--accent); }
+  .latest .date { font-size: .8rem; font-weight: 500; color: var(--muted); }
+  .go { margin-top: 12px; font-weight: 700; font-size: .9rem; color: var(--accent); }
 </style>

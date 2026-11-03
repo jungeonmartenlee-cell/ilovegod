@@ -1,23 +1,28 @@
 ---
 import { render } from 'astro:content';
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import FormButton from '../../components/FormButton.astro';
-import { getSortedQt, formatDate, type Qt } from '../../lib/qt';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import FormButton from '../../../components/FormButton.astro';
+import { getSortedQt, formatDate, qtSlug, qtUrl, type Qt } from '../../../lib/qt';
+import { communities, type CommunityEntry } from '../../../communities';
 
 export async function getStaticPaths() {
-  const qts = await getSortedQt();
-  return qts.map((qt, i) => ({
-    params: { slug: qt.id },
-    props: { qt, newer: qts[i - 1], older: qts[i + 1] },
-  }));
+  const paths = [];
+  for (const community of communities) {
+    const qts = await getSortedQt(community.slug);
+    paths.push(...qts.map((qt, i) => ({
+      params: { community: community.slug, slug: qtSlug(qt) },
+      props: { community, qt, newer: qts[i - 1], older: qts[i + 1] },
+    })));
+  }
+  return paths;
 }
 
-interface Props { qt: Qt; newer?: Qt; older?: Qt }
-const { qt, newer, older } = Astro.props;
+interface Props { community: CommunityEntry; qt: Qt; newer?: Qt; older?: Qt }
+const { community, qt, newer, older } = Astro.props;
 const { Content } = await render(qt);
 const { title, passage, preacher, date, summary } = qt.data;
 ---
-<BaseLayout title={`${title} (${passage})`} description={summary ?? `${passage} · ${preacher}`}>
+<BaseLayout community={community} title={`${title} (${passage})`} description={summary ?? `${passage} · ${preacher}`}>
   <article>
     <header class="qt-head">
       <span class="eyebrow">{formatDate(date)}</span>
@@ -32,22 +37,22 @@ const { title, passage, preacher, date, summary } = qt.data;
     <div class="prose">
       <Content />
     </div>
-    <FormButton />
+    <FormButton community={community} />
   </article>
 
   <nav class="pager" aria-label="다른 주 큐티">
     {older ? (
-      <a href={`/qt/${older.id}`} class="card">
+      <a href={qtUrl(older)} class="card">
         <span class="muted">← 지난 주</span><strong>{older.data.title}</strong>
       </a>
     ) : <span />}
     {newer ? (
-      <a href={`/qt/${newer.id}`} class="card right">
+      <a href={qtUrl(newer)} class="card right">
         <span class="muted">다음 주 →</span><strong>{newer.data.title}</strong>
       </a>
     ) : <span />}
   </nav>
-  <p class="center"><a href="/qt" class="btn ghost">큐티 전체 목록</a></p>
+  <p class="center"><a href={`/${community.slug}/qt`} class="btn ghost">큐티 전체 목록</a></p>
 </BaseLayout>
 
 <script>

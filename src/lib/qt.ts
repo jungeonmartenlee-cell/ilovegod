@@ -2,9 +2,16 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 
 export type Qt = CollectionEntry<'qt'>;
 
-/** 공개된 큐티를 최신순으로 정렬해서 돌려줍니다. */
-export async function getSortedQt(): Promise<Qt[]> {
-  const all = await getCollection('qt', ({ data }) => !data.draft);
+/** 큐티 파일이 속한 공동체 (폴더 이름) — 예: 'gil' */
+export const qtCommunity = (qt: Qt) => qt.id.split('/')[0];
+/** 큐티 주소용 이름 (파일 이름) — 예: '2026-11-01' */
+export const qtSlug = (qt: Qt) => qt.id.split('/').slice(1).join('/');
+/** 큐티 페이지 주소 — 예: '/gil/qt/2026-11-01' */
+export const qtUrl = (qt: Qt) => `/${qtCommunity(qt)}/qt/${qtSlug(qt)}`;
+
+/** 한 공동체의 공개된 큐티를 최신순으로 */
+export async function getSortedQt(community: string): Promise<Qt[]> {
+  const all = await getCollection('qt', (qt) => !qt.data.draft && qtCommunity(qt) === community && qtSlug(qt) !== '');
   return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
@@ -20,4 +27,3 @@ export function shortDate(d: Date): string {
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${m}.${day}`;
 }
-

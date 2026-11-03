@@ -1,0 +1,119 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import QtListItem from '../../components/QtListItem.astro';
+import FormButton from '../../components/FormButton.astro';
+import { getSortedQt, formatDate, qtUrl } from '../../lib/qt';
+import { communities, type CommunityEntry } from '../../communities';
+
+export function getStaticPaths() {
+  return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
+}
+const { community } = Astro.props as { community: CommunityEntry };
+const base = `/${community.slug}`;
+const { mainName, parentNames, tagline, intro, worship } = community;
+
+const qts = await getSortedQt(community.slug);
+const latest = qts[0];
+const recent = qts.slice(1, 4);
+---
+<BaseLayout community={community}>
+  {latest ? (
+    <a class="qt-hero" href={qtUrl(latest)}>
+      <span class="badge">이번 주 큐티</span>
+      <h1>{latest.data.title}</h1>
+      <p class="passage">{latest.data.passage}</p>
+      <p class="meta">{formatDate(latest.data.date)} · {latest.data.preacher}</p>
+      {latest.data.summary && <p class="summary">{latest.data.summary}</p>}
+      <span class="go">묵상 시작하기 →</span>
+    </a>
+  ) : (
+    <div class="card muted">아직 올라온 큐티가 없어요.</div>
+  )}
+  <FormButton community={community} />
+
+  <section class="intro">
+    {parentNames && <span class="eyebrow names">{parentNames}</span>}
+    <h2>{mainName} — {tagline}</h2>
+    <p class="muted">{intro}</p>
+    <a href={`${base}/about`} class="btn ghost">공동체 소개 보기</a>
+  </section>
+
+  <h2 class="section-title">예배 · 모임 안내</h2>
+  <ul class="worship">
+    {worship.map((w) => (
+      <li class="card">
+        <span class="label">{w.label}</span>
+        <strong>{w.time}</strong>
+        <span class="muted">{w.place}</span>
+      </li>
+    ))}
+  </ul>
+
+  {recent.length > 0 && (
+    <>
+      <h2 class="section-title">지난 큐티</h2>
+      <div>{recent.map((qt) => <QtListItem qt={qt} />)}</div>
+      <p><a href={`${base}/qt`} class="more">전체 목록 보기 →</a></p>
+    </>
+  )}
+</BaseLayout>
+
+<style>
+  .qt-hero {
+    display: block;
+    position: relative;
+    padding: 26px 22px 22px;
+    border-radius: 24px;
+    background: linear-gradient(150deg, var(--accent) 0%, #3f5a36 100%);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 10px 30px rgba(63, 90, 54, .25);
+    overflow: hidden;
+  }
+  .qt-hero::after {
+    content: '';
+    position: absolute;
+    right: -40px; top: -40px;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    .qt-hero { background: linear-gradient(150deg, #3f5a36 0%, #2b3f25 100%); box-shadow: none; }
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.18);
+    font-size: .78rem;
+    font-weight: 700;
+  }
+  .qt-hero h1 { margin: 14px 0 6px; font-size: 1.55rem; color: #fff; }
+  .passage { margin: 0; font-weight: 700; font-size: 1.05rem; opacity: .95; }
+  .meta { margin: 2px 0 0; font-size: .85rem; opacity: .8; }
+  .summary { margin: 14px 0 0; font-size: .95rem; opacity: .92; line-height: 1.6; }
+  .go {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: #fff;
+    color: #3f5a36;
+    font-weight: 800;
+    font-size: .92rem;
+  }
+
+  .intro { margin-top: 36px; }
+  .names { letter-spacing: .12em; }
+  .intro h2 { margin: 4px 0 8px; }
+  .intro p { margin: 0 0 16px; }
+
+  .worship { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .worship li { display: flex; flex-direction: column; padding: 16px 18px; }
+  .label { font-size: .8rem; font-weight: 700; color: var(--warm); }
+  .worship strong { font-size: 1.05rem; }
+  .worship .muted { font-size: .9rem; }
+
+  .more { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 700; text-decoration: none; }
+</style>

@@ -3,15 +3,23 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE } from '../config';
-import { brand, namesLine } from '../lib/site';
+import { BRAND, MAIN } from '../config';
+import type { CommunityEntry } from '../communities';
 
 interface Props {
   title?: string;
   description?: string;
+  community?: CommunityEntry;
 }
-const { title, description = SITE.description } = Astro.props;
-const fullTitle = title ? `${title} | ${brand}` : namesLine && namesLine !== brand ? `${brand} · ${namesLine}` : brand;
+const { title, community } = Astro.props;
+const description = Astro.props.description
+  ?? community?.description
+  ?? (community ? `${community.mainName} 소개와 매주 설교 본문에 따른 큐티 나눔 자료` : MAIN.description);
+const brand = BRAND;
+const where = community ? community.mainName : '';
+const fullTitle = title
+  ? `${title} | ${where ? `${where} · ` : ''}${brand}`
+  : community ? `${community.namesLine} · ${brand}` : brand;
 ---
 <!doctype html>
 <html lang="ko">
@@ -32,12 +40,12 @@ const fullTitle = title ? `${title} | ${brand}` : namesLine && namesLine !== bra
     <slot name="head" />
   </head>
   <body>
-    <Header />
+    <Header community={community} />
     <main>
       <div class="container">
         <slot />
       </div>
     </main>
-    <Footer />
+    <Footer community={community} />
   </body>
 </html>

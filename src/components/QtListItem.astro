@@ -1,9 +1,9 @@
 ---
-import { shortDate, type Qt } from '../lib/qt';
+import { shortDate, qtUrl, type Qt } from '../lib/qt';
 interface Props { qt: Qt }
 const { qt } = Astro.props;
 ---
-<a class="item" href={`/qt/${qt.id}`}>
+<a class="item" href={qtUrl(qt)}>
   <span class="date">{shortDate(qt.data.date)}</span>
   <span class="body">
     <span class="title">{qt.data.title}</span>
