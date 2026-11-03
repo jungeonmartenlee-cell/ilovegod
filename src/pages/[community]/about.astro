@@ -6,56 +6,151 @@ export function getStaticPaths() {
   return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
 }
 const { community } = Astro.props as { community: CommunityEntry };
-const base = `/${community.slug}`;
 
 // 이 페이지의 문구는 src/communities/공동체이름.ts 의 about 에서 바꿔요.
-const { mainName, parentNames, intro, attendance, worship } = community;
-const { vision, people, meetings, welcome } = community.about;
+const { mainName, parentNames, intro, attendance, worship, mapQuery } = community;
+const { vision, mascot, smallGroup, org, activities, peopleTitle, people, meetings, welcome, closing } = community.about;
+// 이름이나 사진이 아직 없는 사람은 숨겨요
+const shown = people.filter((p) => p.name || p.photo);
+const featured = shown.filter((p) => p.featured);
+const others = shown.filter((p) => !p.featured);
+const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(mapQuery)}` : '';
 ---
-<BaseLayout community={community} title="공동체 소개" description={`${mainName} 비전, 섬기는 사람들, 모임 안내`}>
+<BaseLayout community={community} title="공동체 소개" description={`${mainName} 소개 · 예배 안내 · 소그룹 안내`}>
   <span class="eyebrow">ABOUT</span>
   <h1>우리는 {mainName}입니다</h1>
   {parentNames && <p class="parents">{parentNames}</p>}
   <p class="muted lead">{intro} {attendance}</p>
 
-  <h2 class="section-title">비전</h2>
-  <blockquote class="verse">
-    <p>{vision.verse}</p>
-    <cite>{vision.ref}</cite>
-  </blockquote>
-  <ul class="points">
-    {vision.points.map((p, i) => (
-      <li class="card">
-        <span class="num">0{i + 1}</span>
-        <div><strong>{p.title}</strong><p class="muted">{p.text}</p></div>
-      </li>
-    ))}
-  </ul>
+  {vision && (
+    <section>
+      <h2 class="section-title">{vision.title ?? '비전'}</h2>
+      <div class="card meaning">
+        {vision.subtitle && <p class="subtitle">{vision.subtitle}</p>}
+        <p class="verse">{vision.verse}<cite>{vision.ref}</cite></p>
+        <ul class="points">
+          {vision.points.map((p) => (
+            <li><strong>{p.title}</strong>{p.text && <span class="muted">{p.text}</span>}</li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )}
 
-  <h2 class="section-title">섬기는 사람들</h2>
-  <ul class="people">
-    {people.map((p) => (
-      <li class="card">
-        <span class="role">{p.role}</span>
-        <strong>{p.name}</strong>
-        {p.note && <span class="muted note">{p.note}</span>}
-      </li>
-    ))}
-  </ul>
+  {mascot && (
+    <div class="card mascot">
+      <svg viewBox="0 0 120 110" aria-hidden="true" class="mascot-img">
+        <path d="M60 104S8 72 8 36C8 18 21 6 37 6c10 0 18 5 23 13 5-8 13-13 23-13 16 0 29 12 29 30 0 36-52 68-52 68z" fill="#f9c6d3" stroke="#3a3330" stroke-width="3"/>
+        <circle cx="45" cy="42" r="3.5" fill="#3a3330"/><circle cx="75" cy="42" r="3.5" fill="#3a3330"/>
+        <path d="M54 52q6 5 12 0" fill="none" stroke="#e0566f" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <span class="role">{mainName} 마스코트</span>
+        <strong>'{mascot.name}'</strong>
+        <p class="muted">{mascot.text}</p>
+      </div>
+    </div>
+  )}
 
-  <h2 class="section-title">모임 안내</h2>
-  <ul class="meetings">
-    {meetings.map((m) => (
-      <li><strong>{m.name}</strong><p class="muted">{m.desc}</p></li>
-    ))}
-  </ul>
+  <h2 class="section-title">예배 안내</h2>
+  {worship.map((w) => (
+    <dl class="card info">
+      <div><dt>시간</dt><dd><strong>{w.time}</strong></dd></div>
+      <div><dt>장소</dt><dd>{w.place}</dd></div>
+      {w.order && <div><dt>순서</dt><dd>{w.order}</dd></div>}
+      {mapUrl && <a class="btn ghost map" href={mapUrl} target="_blank" rel="noopener">지도에서 오는 길 보기</a>}
+    </dl>
+  ))}
 
-  <h2 class="section-title">시간 · 장소</h2>
-  <div class="card times">
-    {worship.map((w) => (
-      <p><span class="role">{w.label}</span><br /><strong>{w.time}</strong> · {w.place}</p>
-    ))}
-  </div>
+  {smallGroup && (
+    <section>
+      <h2 class="section-title">소그룹 안내</h2>
+      <p class="muted body">{smallGroup.intro}</p>
+      <ol class="steps">
+        {smallGroup.steps.map((s, i) => (
+          <li><span class="step-num">{i + 1}</span>{s}</li>
+        ))}
+      </ol>
+      <ul class="notes">
+        {smallGroup.notes.map((n) => <li>{n}</li>)}
+      </ul>
+    </section>
+  )}
+
+  {activities && (
+    <section>
+      <h2 class="section-title">공동체 활동</h2>
+      <ul class="acts">
+        {activities.items.map((a) => <li>{a}</li>)}
+      </ul>
+      {activities.programs?.map((pr) => (
+        <div class="card program">
+          <strong>{pr.title}</strong>
+          <p class="muted">{pr.text}</p>
+          {pr.items && <ul class="notes">{pr.items.map((i) => <li>{i}</li>)}</ul>}
+        </div>
+      ))}
+    </section>
+  )}
+
+  {org && (
+    <section>
+      <h2 class="section-title">소속</h2>
+      <div class="card org">
+        <p class="org-title">{org.title}</p>
+        <ul class="groups">
+          {org.groups.map((g) => (
+            <li class:list={[{ on: g.current }]}>
+              <strong>{g.name}</strong>
+              <span class="muted">{g.desc}</span>
+              {g.children && (
+                <span class="children">
+                  {g.children.map((c) => <span class:list={[{ current: c === g.current }]}>{c}</span>)}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+        {org.note && <p class="org-note">{org.note}</p>}
+      </div>
+    </section>
+  )}
+
+  {shown.length > 0 && (
+    <section>
+      <h2 class="section-title">{peopleTitle ?? '섬기는 사람들'}</h2>
+      {featured.map((p) => (
+        <div class="card pastor">
+          {p.photo && <img src={`/images/${p.photo}`} alt={`${p.role} ${p.name ?? ''}`} loading="lazy" />}
+          <div class="pastor-text">
+            <span class="role">{p.role}</span>
+            {p.name && <strong>{p.name}</strong>}
+          </div>
+          {p.note && <p class="pastor-note">{p.note}</p>}
+        </div>
+      ))}
+      {others.length > 0 && (
+        <ul class="people">
+          {others.map((p) => (
+            <li class="card">
+              <span class="role">{p.role}</span>
+              {p.name && <strong>{p.name}</strong>}
+              {p.note && <span class="muted note">{p.note}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )}
+
+  {meetings && meetings.length > 0 && (
+    <section>
+      <h2 class="section-title">모임 안내</h2>
+      <ul class="meetings">
+        {meetings.map((m) => <li><strong>{m.name}</strong><p class="muted">{m.desc}</p></li>)}
+      </ul>
+    </section>
+  )}
 
   {welcome && (
     <div class="card welcome">
@@ -63,36 +158,92 @@ const { vision, people, meetings, welcome } = community.about;
       <p class="muted">{welcome.text}</p>
     </div>
   )}
+
+  {closing && (
+    <section class="closing">
+      <p class="closing-title">{closing.title}</p>
+      <p class="closing-text">{closing.text}</p>
+      {closing.verse && <p class="closing-verse">“{closing.verse}”<cite>{closing.ref}</cite></p>}
+    </section>
+  )}
 </BaseLayout>
 
 <style>
   .parents { margin: -4px 0 12px; font-size: .8rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
   .lead { margin: 0; }
-  .verse {
-    margin: 0 0 14px;
-    padding: 20px;
-    border-radius: var(--radius);
-    background: var(--warm-soft);
-  }
-  .verse p { margin: 0; font-weight: 600; line-height: 1.75; }
-  .verse cite { display: block; margin-top: 8px; font-style: normal; font-size: .88rem; color: var(--warm); font-weight: 700; }
-
-  ul { list-style: none; margin: 0; padding: 0; }
-  .points { display: grid; gap: 10px; }
-  .points li { display: flex; gap: 14px; padding: 18px; }
-  .num { flex: none; font-weight: 800; color: var(--accent); font-size: 1.05rem; }
-  .points p { margin: 2px 0 0; font-size: .93rem; line-height: 1.6; }
-
-  .people { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .people li { display: flex; flex-direction: column; padding: 16px; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
   .role { font-size: .78rem; font-weight: 700; color: var(--warm); }
-  .note { font-size: .85rem; }
+
+  .meaning { text-align: center; }
+  .subtitle { margin: 0 0 8px; font-weight: 800; font-size: 1.15rem; color: var(--accent); }
+  .verse { margin: 0 0 16px; font-weight: 700; font-size: 1.05rem; }
+  .verse cite { display: block; font-style: normal; font-size: .82rem; color: var(--warm); }
+  .points { display: grid; gap: 8px; }
+  .points li { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); font-size: .95rem; line-height: 1.5; }
+  .points li span { display: block; font-size: .88rem; }
+
+  .mascot { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  .mascot-img { flex: none; width: 76px; height: auto; }
+  .mascot strong { display: block; font-size: 1.05rem; }
+  .mascot p { margin: 2px 0 0; font-size: .9rem; line-height: 1.55; }
+
+  .info { margin: 0 0 10px; display: grid; gap: 10px; }
+  .info div { display: grid; grid-template-columns: 44px 1fr; gap: 8px; }
+  .info dt { font-weight: 800; color: var(--accent); }
+  .info dd { margin: 0; }
+  .map { margin-top: 4px; min-height: 44px; font-size: .9rem; }
+
+  .body { margin: 0 0 14px; line-height: 1.75; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+  .steps li {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 6px; border-radius: 12px; background: var(--accent-soft);
+    font-size: .82rem; font-weight: 700; text-align: center; line-height: 1.35;
+  }
+  .step-num {
+    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent); color: var(--surface); font-size: .78rem;
+  }
+  .notes { display: grid; gap: 8px; }
+  .notes li { position: relative; padding-left: 16px; font-size: .93rem; line-height: 1.65; }
+  .notes li::before { content: '•'; position: absolute; left: 2px; color: var(--accent); font-weight: 800; }
+
+  .org { text-align: center; }
+  .org-title { margin: 0 0 14px; font-weight: 800; font-size: 1.05rem; }
+  .groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .groups li { display: flex; flex-direction: column; gap: 2px; padding: 12px 4px; border-radius: 12px; background: var(--surface-2); }
+  .groups li.on { background: var(--accent-soft); outline: 2px solid var(--accent); }
+  .groups strong { font-size: 1.2rem; }
+  .groups .muted { font-size: .72rem; line-height: 1.4; }
+  .children { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 6px; font-size: .72rem; color: var(--muted); }
+  .children .current { color: var(--surface); background: var(--accent); border-radius: 6px; padding: 0 5px; font-weight: 800; }
+  .org-note { margin: 14px 0 0; font-size: .9rem; font-weight: 600; }
+
+  .pastor { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px 16px; margin-bottom: 10px; }
+  .pastor img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; object-position: 50% 12%; }
+  .pastor-text { display: flex; flex-direction: column; }
+  .pastor strong { font-size: 1.15rem; }
+  .pastor-note { grid-column: 1 / -1; margin: 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size: .95rem; line-height: 1.7; }
+  .people { display: grid; gap: 10px; }
+  .people li { display: flex; flex-direction: column; padding: 16px 18px; }
+  .people strong { font-size: 1.05rem; }
+  .note { margin-top: 4px; font-size: .9rem; line-height: 1.65; }
+
+  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .acts li { padding: 12px; border-radius: 12px; background: var(--surface-2); font-size: .88rem; font-weight: 600; line-height: 1.45; }
+  .program { margin-top: 10px; }
+  .program strong { font-size: 1.02rem; }
+  .program p { margin: 4px 0 8px; font-size: .92rem; line-height: 1.65; }
+
+  .closing { margin-top: 40px; padding: 28px 8px 8px; text-align: center; border-top: 1px solid var(--line); }
+  .closing-title { margin: 0 0 10px; font-weight: 800; letter-spacing: .08em; color: var(--warm); }
+  .closing-text { margin: 0 0 14px; font-size: 1.05rem; font-weight: 700; line-height: 1.7; }
+  .closing-verse { margin: 0; font-size: .9rem; color: var(--muted); }
+  .closing-verse cite { display: block; font-style: normal; font-size: .8rem; }
 
   .meetings li { padding: 14px 0; border-bottom: 1px solid var(--line); }
   .meetings p { margin: 2px 0 0; font-size: .93rem; line-height: 1.6; }
 
-  .times p { margin: 0 0 12px; }
-  .times p:last-child { margin: 0; }
   .welcome { margin-top: 28px; background: var(--accent-soft); border-color: transparent; box-shadow: none; }
   .welcome p { margin: 4px 0 0; font-size: .93rem; }
 </style>

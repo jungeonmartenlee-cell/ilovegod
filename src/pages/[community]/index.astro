@@ -45,6 +45,7 @@ const recent = qts.slice(1, 4);
         <span class="label">{w.label}</span>
         <strong>{w.time}</strong>
         <span class="muted">{w.place}</span>
+        {w.order && <span class="muted order">{w.order}</span>}
       </li>
     ))}
   </ul>
@@ -114,6 +115,7 @@ const recent = qts.slice(1, 4);
   .label { font-size: .8rem; font-weight: 700; color: var(--warm); }
   .worship strong { font-size: 1.05rem; }
   .worship .muted { font-size: .9rem; }
+  .worship .order { margin-top: 6px; font-size: .82rem; }
 
   .more { display: inline-block; margin-top: 8px; color: var(--accent); font-weight: 700; text-decoration: none; }
 </style>
