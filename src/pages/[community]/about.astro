@@ -121,7 +121,7 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
       <h2 class="section-title">{peopleTitle ?? '섬기는 사람들'}</h2>
       {featured.map((p) => (
         <div class:list={['card pastor', { 'has-photo': p.photo }]}>
-          {p.photo && <img src={`/images/${p.photo}`} alt={`${p.role} ${p.name ?? ''}`} width="960" height="720" loading="lazy" />}
+          {p.photo && <img src={`/images/${p.photo}`} alt={`${p.role} ${p.name ?? ''}`} loading="lazy" />}
           <div class="pastor-text">
             <span class="role">{p.role}</span>
             {p.name && <strong>{p.name}</strong>}
@@ -221,7 +221,7 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
 
   .pastor { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px 16px; margin-bottom: 10px; }
   .pastor.has-photo { display: flex; flex-direction: column; align-items: stretch; padding-top: 12px; }
-  .pastor img { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: var(--surface-2); }
+  .pastor img { display: block; width: 100%; max-width: 320px; height: auto; margin: 0 auto; border-radius: 12px; background: var(--surface-2); }
   .pastor.has-photo .pastor-text { align-items: center; text-align: center; }
   .pastor.has-photo .pastor-note { text-align: center; }
   .pastor-text { display: flex; flex-direction: column; }
