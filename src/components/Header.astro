@@ -1,0 +1,66 @@
+---
+import { SITE } from '../config';
+
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const links = [
+  { href: '/', label: '홈' },
+  { href: '/qt', label: '큐티' },
+  { href: '/about', label: '소개' },
+];
+const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+---
+<header>
+  <div class="container bar">
+    <a href="/" class="logo">
+      <span class="dot" aria-hidden="true"></span>{SITE.name}
+    </a>
+    <nav aria-label="주요 메뉴">
+      {links.map((l) => (
+        <a href={l.href} aria-current={isActive(l.href) ? 'page' : undefined}>{l.label}</a>
+      ))}
+    </nav>
+  </div>
+</header>
+
+<style>
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(10px);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 1.05rem;
+    text-decoration: none;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--warm);
+  }
+  nav { display: flex; gap: 2px; }
+  nav a {
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: .92rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  nav a[aria-current='page'] {
+    color: var(--accent);
+    background: var(--accent-soft);
+  }
+</style>

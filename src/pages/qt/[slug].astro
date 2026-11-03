@@ -1,0 +1,143 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getSortedQt, formatDate, type Qt } from '../../lib/qt';
+
+export async function getStaticPaths() {
+  const qts = await getSortedQt();
+  return qts.map((qt, i) => ({
+    params: { slug: qt.id },
+    props: { qt, newer: qts[i - 1], older: qts[i + 1] },
+  }));
+}
+
+interface Props { qt: Qt; newer?: Qt; older?: Qt }
+const { qt, newer, older } = Astro.props;
+const { Content } = await render(qt);
+const { title, passage, preacher, date, summary } = qt.data;
+---
+<BaseLayout title={`${title} (${passage})`} description={summary ?? `${passage} · ${preacher}`}>
+  <article>
+    <header class="qt-head">
+      <span class="eyebrow">{formatDate(date)}</span>
+      <h1>{title}</h1>
+      <p class="passage">{passage}</p>
+      <p class="muted preacher">설교 · {preacher}</p>
+      <button class="btn ghost share" type="button" data-share>
+        <span aria-hidden="true">↗</span> 공유하기
+      </button>
+    </header>
+
+    <div class="prose">
+      <Content />
+    </div>
+  </article>
+
+  <nav class="pager" aria-label="다른 주 큐티">
+    {older ? (
+      <a href={`/qt/${older.id}`} class="card">
+        <span class="muted">← 지난 주</span><strong>{older.data.title}</strong>
+      </a>
+    ) : <span />}
+    {newer ? (
+      <a href={`/qt/${newer.id}`} class="card right">
+        <span class="muted">다음 주 →</span><strong>{newer.data.title}</strong>
+      </a>
+    ) : <span />}
+  </nav>
+  <p class="center"><a href="/qt" class="btn ghost">큐티 전체 목록</a></p>
+</BaseLayout>
+
+<script>
+  // 휴대폰에서는 카카오톡 등으로 바로 공유, 안 되면 주소 복사
+  document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const data = { title: document.title, url: location.href };
+      try {
+        if (navigator.share) return await navigator.share(data);
+        await navigator.clipboard.writeText(location.href);
+        btn.textContent = '주소가 복사됐어요 ✓';
+      } catch { /* 사용자가 취소함 */ }
+    });
+  });
+</script>
+
+<style>
+  .qt-head { padding: 8px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .qt-head h1 { margin: 6px 0 4px; }
+  .passage { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--warm); }
+  .preacher { margin: 2px 0 16px; font-size: .9rem; }
+  .share { min-height: 40px; padding: 0 16px; font-size: .88rem; }
+
+  /* ── 마크다운 본문 스타일 ── */
+  .prose :global(h2) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 36px 0 12px;
+    font-size: 1.15rem;
+  }
+  .prose :global(h2::before) {
+    content: '';
+    width: 4px; height: 1.1em;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .prose :global(p) { margin: 0 0 1em; }
+  .prose :global(strong) { color: var(--text); font-weight: 700; }
+
+  /* 성경 본문 (> 로 쓴 부분) */
+  .prose :global(blockquote) {
+    margin: 0 0 1em;
+    padding: 18px 18px 6px;
+    border-radius: 14px;
+    background: var(--warm-soft);
+    font-size: 1.02rem;
+    line-height: 1.85;
+  }
+  .prose :global(blockquote p) { margin: 0 0 .7em; }
+  .prose :global(blockquote sup),
+  .prose :global(blockquote b),
+  .prose :global(blockquote strong) { color: var(--warm); font-weight: 800; margin-right: 2px; }
+
+  /* 질문 목록 (1. 2. 3.) */
+  .prose :global(ol) {
+    list-style: none;
+    counter-reset: q;
+    padding: 0;
+    margin: 0 0 1em;
+    display: grid;
+    gap: 10px;
+  }
+  .prose :global(ol > li) {
+    counter-increment: q;
+    position: relative;
+    padding: 14px 16px 14px 50px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .prose :global(ol > li::before) {
+    content: counter(q);
+    position: absolute;
+    left: 14px; top: 14px;
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: .8rem;
+    font-weight: 800;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+  }
+  .prose :global(ul) { padding-left: 1.2em; margin: 0 0 1em; }
+  .prose :global(ul > li) { margin-bottom: .4em; }
+  .prose :global(hr) { border: 0; border-top: 1px dashed var(--line); margin: 32px 0; }
+
+  .pager { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 48px; }
+  .pager a { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; text-decoration: none; font-size: .9rem; }
+  .pager .right { text-align: right; }
+  .pager strong { line-height: 1.4; }
+  .center { text-align: center; margin-top: 24px; }
+</style>

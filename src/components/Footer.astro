@@ -1,0 +1,25 @@
+---
+import { SITE, CONTACT } from '../config';
+---
+<footer>
+  <div class="container">
+    <p><strong>{SITE.name}</strong> · {SITE.church}</p>
+    {(CONTACT.instagram || CONTACT.kakao) && (
+      <p class="links">
+        {CONTACT.instagram && <a href={`https://instagram.com/${CONTACT.instagram}`}>인스타그램</a>}
+        {CONTACT.kakao && <a href={CONTACT.kakao}>카카오톡</a>}
+      </p>
+    )}
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 24px 0 calc(32px + env(safe-area-inset-bottom));
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  p { margin: 0 0 4px; }
+  .links { display: flex; gap: 14px; margin-top: 8px; }
+</style>

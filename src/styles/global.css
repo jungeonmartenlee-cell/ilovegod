@@ -1,0 +1,114 @@
+:root {
+  --bg: #faf6ef;
+  --surface: #ffffff;
+  --surface-2: #f3ece0;
+  --text: #2b2620;
+  --muted: #7a6f62;
+  --line: #e8dfd1;
+  --accent: #5c7a4f;        /* 올리브 그린 */
+  --accent-soft: #e6eedf;
+  --warm: #c8794a;          /* 테라코타 */
+  --warm-soft: #f8e7dc;
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(60, 45, 30, .05), 0 6px 20px rgba(60, 45, 30, .06);
+  --max: 640px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1a17;
+    --surface: #25221e;
+    --surface-2: #2e2a25;
+    --text: #efe8dd;
+    --muted: #a99e8f;
+    --line: #3a352e;
+    --accent: #9cbf8a;
+    --accent-soft: #2e3a29;
+    --warm: #e2a07a;
+    --warm-soft: #3a2b22;
+    --shadow: 0 1px 2px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+  word-break: keep-all;          /* 한글 단어 중간에서 줄바꿈 방지 */
+  overflow-wrap: anywhere;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+img { max-width: 100%; height: auto; }
+
+.container {
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+main { padding: 20px 0 56px; }
+
+h1, h2, h3 { line-height: 1.35; letter-spacing: -0.025em; }
+h1 { font-size: 1.6rem; font-weight: 800; margin: 0 0 .4em; }
+h2 { font-size: 1.2rem; font-weight: 700; }
+
+.eyebrow {
+  display: inline-block;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+  color: var(--accent);
+}
+
+.muted { color: var(--muted); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  font-size: .95rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) { .btn { color: #1c1a17; } }
+.btn.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.section-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 36px 0 12px;
+}
