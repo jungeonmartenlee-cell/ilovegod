@@ -4,7 +4,7 @@ import type { CommunityEntry } from '../communities';
 
 interface Props { community?: CommunityEntry }
 const { community } = Astro.props;
-const home = community ? `/${community.slug}` : '/';
+const home = '/'; // 로고를 누르면 공동체 고르는 첫 화면으로
 ---
 <header>
   <div class="container bar">
