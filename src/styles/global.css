@@ -8,12 +8,12 @@
   --muted: #6e6e73;
   --faint: #8e8e93;
   --line: rgba(60, 60, 67, 0.13);
-  --accent: #1e5eff;            /* 파란 강조색 */
-  --accent-soft: rgba(30, 94, 255, 0.1);
+  --accent: #f37021;            /* 에르메스 주황 */
+  --accent-soft: rgba(243, 112, 33, 0.12);
   --ink: #111111;               /* 검은 버튼 */
   --ink-text: #ffffff;
-  --tint: #e9eefb;              /* 카드 아래쪽 유리 영역 */
-  --heart: #ee5d78;
+  --tint: #fcefe5;              /* 카드 아래쪽 은은한 주황 */
+  --heart: #f37021;
 
   /* 리퀴드 글래스 */
   --glass: rgba(255, 255, 255, 0.58);
@@ -39,14 +39,14 @@
     --card: #1c1c1e;
     --ink: #f5f5f7;
     --ink-text: #000;
-    --tint: #1f2533;
+    --tint: #2c211a;
     --text: #f5f5f7;
     --muted: #a1a1a6;
     --faint: #7c7c80;
     --line: rgba(255, 255, 255, 0.12);
-    --accent: #4d8bff;
-    --accent-soft: rgba(77, 139, 255, 0.16);
-    --heart: #ff6f8a;
+    --accent: #ff8a3d;
+    --accent-soft: rgba(255, 138, 61, 0.16);
+    --heart: #ff8a3d;
     --glass: rgba(40, 40, 46, 0.55);
     --glass-strong: rgba(44, 44, 50, 0.86);
     --glass-edge: rgba(255, 255, 255, 0.12);
