@@ -24,7 +24,7 @@ const cards = await Promise.all(
   <ul class="list">
     {cards.map(({ c, latest }) => (
       <li>
-        <a class="glass community" href={`/${c.slug}`}>
+        <a class="card community" href={`/${c.slug}`}>
           <span class="top">
             <span class="name-wrap">
               <strong class="name">{c.mainName}</strong>
@@ -49,19 +49,19 @@ const cards = await Promise.all(
 <style>
   .hero { text-align: center; padding: 40px 0 8px; }
   .mark { width: 40px; height: 40px; fill: var(--heart); }
-  .hero h1 { margin: 12px 0 6px; font-size: 2.1rem; letter-spacing: -0.045em; }
+  .hero h1 { margin: 12px 0 6px; font-size: 2.2rem; letter-spacing: -0.05em; }
   .tagline { margin: 0 0 12px; font-size: 1.05rem; font-weight: 600; color: var(--muted); }
   .intro { margin: 0 auto; max-width: 26em; font-size: .95rem; line-height: 1.7; }
 
   .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-  .community { display: flex; flex-direction: column; padding: 20px; border-radius: 26px; text-decoration: none; }
+  .community { display: flex; flex-direction: column; padding: 22px; border-radius: 30px; text-decoration: none; }
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .name-wrap { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .name { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
   .names { font-size: .68rem; font-weight: 600; letter-spacing: .16em; color: var(--faint); }
   .tag { margin-top: 2px; font-size: .95rem; color: var(--muted); }
   .latest { display: flex; flex-direction: column; margin-top: 16px; padding-top: 14px; border-top: 0.5px solid var(--line); line-height: 1.45; }
-  .label { font-size: .75rem; font-weight: 600; color: var(--accent); }
+  .label { font-size: .75rem; font-weight: 700; color: var(--accent); }
   .qt { margin-top: 2px; font-weight: 600; }
   .date { font-size: .82rem; color: var(--faint); }
 </style>

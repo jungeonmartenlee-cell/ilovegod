@@ -75,7 +75,7 @@ const { title, passage, preacher, date, summary } = qt.data;
 
 <style>
   .qt-head { padding: 12px 0 24px; }
-  .qt-head h1 { margin: 6px 0 6px; font-size: 2rem; }
+  .qt-head h1 { margin: 6px 0 6px; font-size: 2.1rem; }
   .passage { margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--accent); }
   .preacher { margin: 2px 0 18px; font-size: .9rem; }
   .share { min-height: 38px; padding: 0 16px; font-size: .88rem; }
@@ -84,11 +84,10 @@ const { title, passage, preacher, date, summary } = qt.data;
   /* ── 마크다운 본문 ── */
   .prose { font-size: 1.04rem; line-height: 1.8; }
   .prose :global(h2) {
-    margin: 44px 0 12px;
-    font-size: .82rem;
-    font-weight: 600;
-    letter-spacing: .02em;
-    color: var(--muted);
+    margin: 44px 0 14px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
   }
   .prose :global(p) { margin: 0 0 1em; }
   .prose :global(strong) { font-weight: 700; }
@@ -98,11 +97,8 @@ const { title, passage, preacher, date, summary } = qt.data;
     margin: 0 0 1em;
     padding: 20px 20px 8px;
     border-radius: var(--radius);
-    background: var(--glass);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-    border: 0.5px solid var(--glass-edge);
-    box-shadow: var(--glass-shadow);
+    background: var(--card);
+    border: 0.5px solid var(--line);
     font-size: 1.08rem;
     line-height: 1.9;
   }
@@ -116,11 +112,8 @@ const { title, passage, preacher, date, summary } = qt.data;
     margin: 0 0 1em;
     padding: 0;
     border-radius: var(--radius);
-    background: var(--glass);
-    -webkit-backdrop-filter: var(--blur);
-    backdrop-filter: var(--blur);
-    border: 0.5px solid var(--glass-edge);
-    box-shadow: var(--glass-shadow);
+    background: var(--card);
+    border: 0.5px solid var(--line);
     overflow: hidden;
   }
   .prose :global(ol > li) {
