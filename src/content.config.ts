@@ -1,11 +1,11 @@
-// 큐티 자료(마크다운 파일)의 형식을 정의합니다.
+// GBS 자료(마크다운 파일)의 형식을 정의합니다.
 // 파일 맨 위 frontmatter(--- 사이 부분)에 아래 항목이 꼭 있어야 해요.
 import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
 import { z } from 'astro/zod';
 
-const qt = defineCollection({
-  loader: glob({ pattern: '**/[^_]*.md', base: './src/content/qt' }),
+const gbs = defineCollection({
+  loader: glob({ pattern: '**/[^_]*.md', base: './src/content/gbs' }),
   schema: z.object({
     date: z.coerce.date(),              // 설교 날짜 (예: 2026-11-01)
     title: z.string(),                  // 설교 제목
@@ -16,4 +16,4 @@ const qt = defineCollection({
   }),
 });
 
-export const collections = { qt };
+export const collections = { gbs };

@@ -2,29 +2,29 @@
 import { render } from 'astro:content';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import FormButton from '../../../components/FormButton.astro';
-import { getSortedQt, formatDate, qtSlug, qtUrl, type Qt } from '../../../lib/qt';
+import { getSortedGbs, formatDate, gbsSlug, gbsUrl, type Gbs } from '../../../lib/gbs';
 import { communities, type CommunityEntry } from '../../../communities';
 
 export async function getStaticPaths() {
   const paths = [];
   for (const community of communities) {
-    const qts = await getSortedQt(community.slug);
-    paths.push(...qts.map((qt, i) => ({
-      params: { community: community.slug, slug: qtSlug(qt) },
-      props: { community, qt, newer: qts[i - 1], older: qts[i + 1] },
+    const items = await getSortedGbs(community.slug);
+    paths.push(...items.map((gbs, i) => ({
+      params: { community: community.slug, slug: gbsSlug(gbs) },
+      props: { community, gbs, newer: items[i - 1], older: items[i + 1] },
     })));
   }
   return paths;
 }
 
-interface Props { community: CommunityEntry; qt: Qt; newer?: Qt; older?: Qt }
-const { community, qt, newer, older } = Astro.props;
-const { Content } = await render(qt);
-const { title, passage, preacher, date, summary } = qt.data;
+interface Props { community: CommunityEntry; gbs: Gbs; newer?: Gbs; older?: Gbs }
+const { community, gbs, newer, older } = Astro.props;
+const { Content } = await render(gbs);
+const { title, passage, preacher, date, summary } = gbs.data;
 ---
 <BaseLayout community={community} title={`${title} (${passage})`} description={summary ?? `${passage} · ${preacher}`}>
   <article>
-    <header class="qt-head">
+    <header class="gbs-head">
       <span class="eyebrow">{formatDate(date)}</span>
       <h1>{title}</h1>
       <p class="passage">{passage}</p>
@@ -41,19 +41,19 @@ const { title, passage, preacher, date, summary } = qt.data;
     <FormButton community={community} />
   </article>
 
-  <nav class="pager group" aria-label="다른 주 큐티">
+  <nav class="pager group" aria-label="다른 주 GBS">
     {newer && (
-      <a href={qtUrl(newer)}>
+      <a href={gbsUrl(newer)}>
         <span class="dir">다음 주</span><span class="t">{newer.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
     )}
     {older && (
-      <a href={qtUrl(older)}>
+      <a href={gbsUrl(older)}>
         <span class="dir">지난 주</span><span class="t">{older.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </a>
     )}
-    <a href={`/${community.slug}/qt`}>
-      <span class="dir">목록</span><span class="t">큐티 전체 보기</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <a href={`/${community.slug}/gbs`}>
+      <span class="dir">목록</span><span class="t">GBS 전체 보기</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
   </nav>
 </BaseLayout>
@@ -74,8 +74,8 @@ const { title, passage, preacher, date, summary } = qt.data;
 </script>
 
 <style>
-  .qt-head { padding: 12px 0 24px; }
-  .qt-head h1 { margin: 6px 0 6px; font-size: 2.1rem; }
+  .gbs-head { padding: 12px 0 24px; }
+  .gbs-head h1 { margin: 6px 0 6px; font-size: 2.1rem; }
   .passage { margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--accent); }
   .preacher { margin: 2px 0 18px; font-size: .9rem; }
   .share { min-height: 38px; padding: 0 16px; font-size: .88rem; }

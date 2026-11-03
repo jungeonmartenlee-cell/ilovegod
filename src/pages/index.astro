@@ -4,10 +4,10 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { BRAND, MAIN } from '../config';
 import { communities } from '../communities';
-import { getSortedQt, formatDate } from '../lib/qt';
+import { getSortedGbs, formatDate } from '../lib/gbs';
 
 const cards = await Promise.all(
-  communities.map(async (c) => ({ c, latest: (await getSortedQt(c.slug))[0] })),
+  communities.map(async (c) => ({ c, latest: (await getSortedGbs(c.slug))[0] })),
 );
 ---
 <BaseLayout>
@@ -35,8 +35,8 @@ const cards = await Promise.all(
           <span class="tag">{c.tagline}</span>
           {latest && (
             <span class="latest">
-              <span class="label">이번 주 큐티</span>
-              <span class="qt">{latest.data.title}</span>
+              <span class="label">이번 주 GBS</span>
+              <span class="gbs">{latest.data.title}</span>
               <span class="date">{latest.data.passage} · {formatDate(latest.data.date)}</span>
             </span>
           )}
@@ -62,6 +62,6 @@ const cards = await Promise.all(
   .tag { margin-top: 2px; font-size: .95rem; color: var(--muted); }
   .latest { display: flex; flex-direction: column; margin-top: 16px; padding-top: 14px; border-top: 0.5px solid var(--line); line-height: 1.45; }
   .label { font-size: .75rem; font-weight: 700; color: var(--accent); }
-  .qt { margin-top: 2px; font-weight: 600; }
+  .gbs { margin-top: 2px; font-weight: 600; }
   .date { font-size: .82rem; color: var(--faint); }
 </style>

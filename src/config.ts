@@ -8,7 +8,7 @@ export const BRAND = '하나님을사랑합니다';
 
 // 메인 페이지 (/) 문구
 export const MAIN = {
-  tagline: '말씀을 함께 묵상하는 청년 공동체들',
-  intro: '매주 주일 설교 본문으로 한 주 동안 묵상하고, 소그룹에서 삶을 나눠요. 아래에서 우리 공동체를 찾아 들어가세요.',
-  description: '하나님을사랑합니다 — 청년 공동체 소개와 매주 큐티 나눔 자료',
+  tagline: '설교 후, 함께 나누는 말씀',
+  intro: '주일 설교를 듣고 소그룹에서 함께 나누는 GBS(Group Bible Study) 자료를 공동체별로 모았어요. 우리 공동체를 찾아 들어가세요.',
+  description: '하나님을사랑합니다 — 공동체별 GBS(Group Bible Study) 나눔 자료',
 };

@@ -1,7 +1,7 @@
 ---
-// QR코드용 고정 주소: /공동체/qt/latest  (예: /gil/qt/latest)
-// 사이트를 다시 만들 때마다 그 공동체의 가장 최신 큐티로 자동 연결됩니다.
-import { getSortedQt, qtUrl } from '../../../lib/qt';
+// QR코드용 고정 주소: /공동체/gbs/latest  (예: /gil/gbs/latest)
+// 사이트를 다시 만들 때마다 그 공동체의 가장 최신 GBS로 자동 연결됩니다.
+import { getSortedGbs, gbsUrl } from '../../../lib/gbs';
 import { communities, type CommunityEntry } from '../../../communities';
 
 export function getStaticPaths() {
@@ -10,8 +10,8 @@ export function getStaticPaths() {
 const { community } = Astro.props as { community: CommunityEntry };
 const base = `/${community.slug}`;
 
-const [latest] = await getSortedQt(community.slug);
-const target = latest ? qtUrl(latest) : `${base}/qt`;
+const [latest] = await getSortedGbs(community.slug);
+const target = latest ? gbsUrl(latest) : `${base}/gbs`;
 ---
 <!doctype html>
 <html lang="ko">
@@ -19,12 +19,12 @@ const target = latest ? qtUrl(latest) : `${base}/qt`;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>이번 주 큐티로 이동 중…</title>
+    <title>이번 주 GBS로 이동 중…</title>
     <meta http-equiv="refresh" content={`0; url=${target}`} />
     <link rel="canonical" href={target} />
     <script is:inline define:vars={{ target }}>location.replace(target);</script>
   </head>
   <body style="font-family:sans-serif;padding:24px">
-    <p>이번 주 큐티로 이동 중이에요… <a href={target}>바로 가기</a></p>
+    <p>이번 주 GBS로 이동 중이에요… <a href={target}>바로 가기</a></p>
   </body>
 </html>

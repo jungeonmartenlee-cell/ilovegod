@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import GbsListItem from '../../../components/GbsListItem.astro';
+import { getSortedGbs } from '../../../lib/gbs';
+import { communities, type CommunityEntry } from '../../../communities';
+
+export function getStaticPaths() {
+  return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
+}
+const { community } = Astro.props as { community: CommunityEntry };
+const base = `/${community.slug}`;
+
+const items = await getSortedGbs(community.slug);
+
+// 연도별로 묶기
+const byYear = new Map<number, typeof items>();
+for (const gbs of items) {
+  const y = gbs.data.date.getUTCFullYear();
+  byYear.set(y, [...(byYear.get(y) ?? []), gbs]);
+}
+---
+<BaseLayout community={community} title="GBS" description="주일 설교 후 소그룹에서 함께 나누는 GBS(Group Bible Study) 자료">
+    <h1>GBS</h1>
+  <p class="sub">Group Bible Study</p>
+  <p class="muted">주일 설교 후, 소그룹에서 함께 나누는 말씀 나눔 자료예요.</p>
+
+  {items.length === 0 && <p class="muted">아직 올라온 GBS 자료가 없어요.</p>}
+
+  {[...byYear].map(([year, list]) => (
+    <section>
+      <h2 class="section-title">{year}년</h2>
+      <div class="group">{list.map((gbs) => <GbsListItem gbs={gbs} />)}</div>
+    </section>
+  ))}
+</BaseLayout>
+
+<style>
+  h1 { margin: 12px 0 0; }
+  .sub { margin: 0 0 8px; font-weight: 600; color: var(--accent); }
+  section .section-title { margin: 32px 0 12px; font-size: 1.4rem; }
+</style>

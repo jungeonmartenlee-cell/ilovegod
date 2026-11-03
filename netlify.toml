@@ -6,8 +6,19 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# QR 고정 주소(/qt/latest)는 항상 새로 받아오도록 (캐시 방지)
+# QR 고정 주소(/공동체/gbs/latest)는 항상 새로 받아오도록 (캐시 방지)
 [[headers]]
-  for = "/qt/latest/*"
+  for = "/*/gbs/latest/*"
   [headers.values]
     Cache-Control = "no-cache"
+
+# 예전 주소(/공동체/qt/...)로 들어오면 새 주소(/공동체/gbs/...)로 연결
+[[redirects]]
+  from = "/:community/qt/*"
+  to = "/:community/gbs/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/:community/qt"
+  to = "/:community/gbs"
+  status = 301

@@ -15,7 +15,7 @@ interface Props {
 const { title, community } = Astro.props;
 const description = Astro.props.description
   ?? community?.description
-  ?? (community ? `${community.mainName} 소개와 매주 설교 본문에 따른 큐티 나눔 자료` : MAIN.description);
+  ?? (community ? `${community.mainName} 소개와 주일 설교 후 소그룹 GBS 나눔 자료` : MAIN.description);
 const brand = BRAND;
 const where = community ? community.mainName : '';
 const fullTitle = title
