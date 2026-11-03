@@ -3,14 +3,15 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE } from '../config';
+import { SITE, BRAND } from '../config';
 
 interface Props {
   title?: string;
   description?: string;
 }
 const { title, description = SITE.description } = Astro.props;
-const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} · ${SITE.church}`;
+const brand = BRAND || SITE.name;
+const fullTitle = title ? `${title} | ${brand}` : `${brand} · ${SITE.name}`;
 ---
 <!doctype html>
 <html lang="ko">
@@ -24,7 +25,7 @@ const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} · ${SITE.ch
     <meta name="description" content={description} />
     <!-- 카카오톡·문자로 링크 공유할 때 보이는 미리보기 -->
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:site_name" content={brand} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
