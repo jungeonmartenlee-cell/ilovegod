@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import QtListItem from '../components/QtListItem.astro';
 import FormButton from '../components/FormButton.astro';
 import { SITE, WORSHIP } from '../config';
+import { mainName, parentNames } from '../lib/site';
 import { getSortedQt, formatDate } from '../lib/qt';
 
 const qts = await getSortedQt();
@@ -25,10 +26,10 @@ const recent = qts.slice(1, 4);
   <FormButton />
 
   <section class="intro">
-    <span class="eyebrow">{SITE.church}</span>
-    <h2>{SITE.name} — {SITE.tagline}</h2>
+    {parentNames && <span class="eyebrow names">{parentNames}</span>}
+    <h2>{mainName} — {SITE.tagline}</h2>
     <p class="muted">{SITE.intro}</p>
-    <a href="/about" class="btn ghost">부서 소개 보기</a>
+    <a href="/about" class="btn ghost">공동체 소개 보기</a>
   </section>
 
   <h2 class="section-title">예배 · 모임 안내</h2>
@@ -98,6 +99,7 @@ const recent = qts.slice(1, 4);
   }
 
   .intro { margin-top: 36px; }
+  .names { letter-spacing: .12em; }
   .intro h2 { margin: 4px 0 8px; }
   .intro p { margin: 0 0 16px; }
 

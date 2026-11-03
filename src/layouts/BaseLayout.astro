@@ -3,15 +3,15 @@ import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE, BRAND } from '../config';
+import { SITE } from '../config';
+import { brand, namesLine } from '../lib/site';
 
 interface Props {
   title?: string;
   description?: string;
 }
 const { title, description = SITE.description } = Astro.props;
-const brand = BRAND || SITE.name;
-const fullTitle = title ? `${title} | ${brand}` : `${brand} · ${SITE.name}`;
+const fullTitle = title ? `${title} | ${brand}` : namesLine && namesLine !== brand ? `${brand} · ${namesLine}` : brand;
 ---
 <!doctype html>
 <html lang="ko">

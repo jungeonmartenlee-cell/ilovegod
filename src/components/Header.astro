@@ -1,5 +1,5 @@
 ---
-import { SITE, BRAND } from '../config';
+import { brand, namesLine } from '../lib/site';
 
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const links = [
@@ -11,13 +11,13 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWit
 ---
 <header>
   <div class="container bar">
-    <a href="/" class="logo" aria-label={`${BRAND || SITE.name} 홈`}>
+    <a href="/" class="logo" aria-label={`${brand} 홈`}>
       <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/>
       </svg>
       <span class="words">
-        <span class="brand">{BRAND || SITE.name}</span>
-        {BRAND && <span class="dept">{SITE.name}</span>}
+        <span class="brand">{brand}</span>
+        {namesLine && namesLine !== brand && <span class="dept">{namesLine}</span>}
       </span>
     </a>
     <nav aria-label="주요 메뉴">
@@ -60,7 +60,7 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path.startsWit
     letter-spacing: -0.04em;
     white-space: nowrap;
   }
-  .dept { font-size: .72rem; font-weight: 600; color: var(--muted); }
+  .dept { font-size: .66rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); white-space: nowrap; }
   nav { display: flex; gap: 2px; }
   nav { flex: none; }
   nav a {

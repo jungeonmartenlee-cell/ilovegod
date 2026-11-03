@@ -1,9 +1,10 @@
 ---
-import { SITE, CONTACT, BRAND } from '../config';
+import { CONTACT, BRAND } from '../config';
+import { namesLine } from '../lib/site';
 ---
 <footer>
   <div class="container">
-    <p><strong>{SITE.name}</strong> · {SITE.church}</p>
+    <p class="names">{namesLine}</p>
     {(CONTACT.instagram || CONTACT.kakao) && (
       <p class="links">
         {CONTACT.instagram && <a href={`https://instagram.com/${CONTACT.instagram}`}>인스타그램</a>}
@@ -22,6 +23,7 @@ import { SITE, CONTACT, BRAND } from '../config';
     color: var(--muted);
   }
   p { margin: 0 0 4px; }
+  .names { font-weight: 700; letter-spacing: .12em; }
   .brand { margin-top: 14px; font-size: .8rem; font-weight: 600; color: var(--warm); letter-spacing: .02em; }
   .links { display: flex; gap: 14px; margin-top: 8px; }
 </style>

@@ -1,14 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SITE, WORSHIP, ABOUT } from '../config';
-import { eulReul } from '../lib/qt';
+import { mainName, parentNames } from '../lib/site';
 
 // 이 페이지의 문구는 src/config.ts 의 ABOUT 에서 바꿔요.
 const { vision, people, meetings, welcome } = ABOUT;
 ---
-<BaseLayout title="부서 소개" description={`${SITE.name} 비전, 섬기는 사람들, 모임 안내`}>
+<BaseLayout title="공동체 소개" description={`${mainName} 비전, 섬기는 사람들, 모임 안내`}>
   <span class="eyebrow">ABOUT</span>
-  <h1>{eulReul(SITE.name)} 소개합니다</h1>
+  <h1>우리는 {mainName}입니다</h1>
+  {parentNames && <p class="parents">{parentNames}</p>}
   <p class="muted lead">{SITE.intro} {SITE.attendance}</p>
 
   <h2 class="section-title">비전</h2>
@@ -57,6 +58,7 @@ const { vision, people, meetings, welcome } = ABOUT;
 </BaseLayout>
 
 <style>
+  .parents { margin: -4px 0 12px; font-size: .8rem; font-weight: 700; letter-spacing: .14em; color: var(--muted); }
   .lead { margin: 0; }
   .verse {
     margin: 0 0 14px;
