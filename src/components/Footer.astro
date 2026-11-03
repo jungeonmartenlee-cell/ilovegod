@@ -1,5 +1,5 @@
 ---
-import { SITE, CONTACT } from '../config';
+import { SITE, CONTACT, BRAND } from '../config';
 ---
 <footer>
   <div class="container">
@@ -10,6 +10,7 @@ import { SITE, CONTACT } from '../config';
         {CONTACT.kakao && <a href={CONTACT.kakao}>카카오톡</a>}
       </p>
     )}
+    {BRAND && <p class="brand">♡ {BRAND}</p>}
   </div>
 </footer>
 
@@ -21,5 +22,6 @@ import { SITE, CONTACT } from '../config';
     color: var(--muted);
   }
   p { margin: 0 0 4px; }
+  .brand { margin-top: 14px; font-size: .8rem; font-weight: 600; color: var(--warm); letter-spacing: .02em; }
   .links { display: flex; gap: 14px; margin-top: 8px; }
 </style>

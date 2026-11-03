@@ -66,3 +66,6 @@ export const CONTACT = {
   instagram: '', // 예: 'youth4_official'
   kakao: '',     // 카카오톡 오픈채팅/채널 주소
 };
+
+// ── 6. 사이트 맨 아래 표시 문구 ────────────────────────────
+export const BRAND = '하나님을사랑합니다';
