@@ -1,38 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE, WORSHIP } from '../config';
+import { SITE, WORSHIP, ABOUT } from '../config';
+import { eulReul } from '../lib/qt';
 
-// ── 아래 내용은 임시 문구예요. 부서에 맞게 자유롭게 고쳐 주세요. ──
-const vision = {
-  verse: '“오직 우리 주 되신 구주 예수 그리스도의 은혜와 그를 아는 지식에서 자라 가라”',
-  ref: '베드로후서 3:18',
-  points: [
-    { title: '말씀으로 자라는 공동체', text: '주일 설교 본문을 한 주 동안 함께 묵상하며, 말씀이 삶의 기준이 되도록 훈련합니다.' },
-    { title: '삶을 나누는 공동체', text: '소그룹 안에서 기쁨과 고민을 솔직하게 나누고, 서로를 위해 기도합니다.' },
-    { title: '세상으로 보냄받는 공동체', text: '각자의 일터와 캠퍼스에서 작은 예수로 살아가도록 서로를 격려합니다.' },
-  ],
-};
-
-const people = [
-  { role: '담당 교역자', name: '홍길동 목사', note: '말씀과 양육' },
-  { role: '부장', name: '김OO 집사', note: '부서 총괄' },
-  { role: '회장', name: '이OO', note: '임원단 · 행사' },
-  { role: '부회장', name: '박OO', note: '새가족 · 소그룹' },
-  { role: '총무', name: '최OO', note: '재정 · 행정' },
-  { role: '찬양팀장', name: '정OO', note: '예배 찬양' },
-];
-
-const meetings = [
-  { name: '주일 예배', desc: '함께 드리는 청년4부 예배. 설교 본문이 그 주의 큐티 본문이 됩니다.' },
-  { name: '소그룹 (순모임)', desc: '예배 후 6~8명씩 모여 큐티 나눔 질문으로 한 주의 삶과 말씀을 나눕니다.' },
-  { name: '새가족 모임', desc: '처음 오신 분들을 위한 4주 과정. 공동체를 알아가고 소그룹에 연결됩니다.' },
-  { name: '수련회 · 행사', desc: '여름·겨울 수련회, 체육대회, 연말 감사예배 등 함께하는 시간이 있어요.' },
-];
+// 이 페이지의 문구는 src/config.ts 의 ABOUT 에서 바꿔요.
+const { vision, people, meetings, welcome } = ABOUT;
 ---
 <BaseLayout title="부서 소개" description={`${SITE.name} 비전, 섬기는 사람들, 모임 안내`}>
   <span class="eyebrow">ABOUT</span>
-  <h1>{SITE.name}를 소개합니다</h1>
-  <p class="muted lead">{SITE.intro} 매주 약 140명의 청년들이 함께 예배하고 있어요.</p>
+  <h1>{eulReul(SITE.name)} 소개합니다</h1>
+  <p class="muted lead">{SITE.intro} {SITE.attendance}</p>
 
   <h2 class="section-title">비전</h2>
   <blockquote class="verse">
@@ -74,8 +51,8 @@ const meetings = [
   </div>
 
   <div class="card welcome">
-    <strong>처음 오셨나요?</strong>
-    <p class="muted">예배 후 입구의 새가족 안내 테이블로 오시면 반갑게 맞이해 드릴게요.</p>
+    <strong>{welcome.title}</strong>
+    <p class="muted">{welcome.text}</p>
   </div>
 </BaseLayout>
 

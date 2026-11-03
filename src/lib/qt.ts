@@ -20,3 +20,10 @@ export function shortDate(d: Date): string {
   const day = String(d.getUTCDate()).padStart(2, '0');
   return `${m}.${day}`;
 }
+
+/** 받침에 따라 '을' / '를' 붙이기 (예: 청년부를, 청년국을) */
+export function eulReul(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  if (code < 0 || code > 11171) return `${word}를`;
+  return `${word}${code % 28 ? '을' : '를'}`;
+}
