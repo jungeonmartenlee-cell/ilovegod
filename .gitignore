@@ -5,3 +5,6 @@ dist/
 .netlify/
 .DS_Store
 .env
+.firebase/
+firebase-debug.log
+*-debug.log
