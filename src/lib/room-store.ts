@@ -4,6 +4,7 @@
 
 export interface RoomMessage {
   id: string;
+  uid?: string;       // 보낸 사람 (Firebase)
   name: string;
   text: string;
   q: string;          // 어떤 질문에 대한 글인지

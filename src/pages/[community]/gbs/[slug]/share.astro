@@ -37,7 +37,6 @@ const data = {
       <strong class="form-title">리더라면, 나눔방을 열어 주세요</strong>
       <label>소그룹 이름<input name="group" placeholder="예: 3순" required maxlength="12" /></label>
       <label>리더 비밀번호<input name="pin" type="password" inputmode="numeric" placeholder="숫자 4자리" required maxlength="8" /></label>
-      <p class="hint">시안에서는 아무 숫자나 넣어도 돼요.</p>
       <button class="btn full" type="submit">나눔방 열기</button>
     </form>
 
@@ -124,6 +123,15 @@ const data = {
     </div>
   </section>
 
+  <!-- 방을 찾을 수 없음 -->
+  <section class="screen" data-screen="missing" hidden>
+    <h1 class="center">나눔방을 열 수 없어요</h1>
+    <p class="center muted lead" data-missing-msg></p>
+    <a class="btn full" href={`/${community.slug}`}>처음으로</a>
+  </section>
+
+  <div class="toast" data-toast hidden role="status"></div>
+
   <!-- ⑤ 마침 -->
   <section class="screen" data-screen="closed" hidden>
     <h1 class="center">오늘 나눔을 마쳤어요</h1>
@@ -135,7 +143,8 @@ const data = {
 
 <script>
   import QRCode from 'qrcode';
-  import { LocalStore, type RoomState, type RoomMessage } from '../../../../lib/room-store';
+  import { LocalStore, type RoomState, type RoomMessage, type RoomStore } from '../../../../lib/room-store';
+  import { FirebaseStore, openRoom, RoomError } from '../../../../lib/room-firebase';
   import type { RoomQuestion } from '../../../../lib/gbs';
 
   const data = JSON.parse(document.getElementById('room-data')!.textContent!) as {
@@ -150,34 +159,55 @@ const data = {
   const meKey = () => `gbsme:${data.key}:${room}`;
   const loadMe = (): { name?: string; leader?: boolean } => { try { return JSON.parse(localStorage.getItem(meKey()) || '{}'); } catch { return {}; } };
   const saveMe = (m: object) => { try { localStorage.setItem(meKey(), JSON.stringify(m)); } catch { /* 무시 */ } };
-  let store: LocalStore | null = null;
+  let store: (RoomStore & { uid?: string; isLeader?: boolean }) | null = null;
   let me = loadMe();
   let prayOn = false;
 
   const groupOf = (code: string) => code.split('-').slice(0, -1).join('-') || code;
   const show = (name: string) => $$('[data-screen]').forEach((s) => (s.hidden = s.dataset.screen !== name));
   const setGroupLabels = () => $$('[data-group-label]').forEach((el) => (el.textContent = `${groupOf(room)} 나눔방`));
-  const openStore = () => { store = new LocalStore(`${data.key}:${room}`, data.questions[0]?.id ?? 'pray'); return store; };
+  const firstQ = data.questions[0]?.id ?? 'pray';
+  const emu = new URLSearchParams(location.search).has('emulator') ? '&emulator=1' : '';
+  const toast = (msg: string) => {
+    const t = $('[data-toast]'); t.textContent = msg; t.hidden = false;
+    clearTimeout((t as any)._h); (t as any)._h = setTimeout(() => (t.hidden = true), 3500);
+  };
+  const openLocal = () => { const s = new LocalStore(`${data.key}:${room}`, firstQ); store = s; return s; };
+  async function openStore() {
+    const s = new FirebaseStore(room, firstQ, toast);
+    await s.start();
+    store = s;
+    return s;
+  }
   const qOf = (id: string) => data.questions.find((q) => q.id === id) ?? data.questions[0];
   const label = (q: RoomQuestion) => (q.num ? `${q.section} ${q.num}` : q.section);
 
   // ── 화면 ①: 리더가 방 열기
-  $('[data-start]').addEventListener('submit', (e) => {
+  $('[data-start]').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const f = new FormData(e.target as HTMLFormElement);
-    const group = String(f.get('group')).trim().replace(/\s+/g, '');
-    room = `${group}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    history.replaceState(null, '', `?room=${encodeURIComponent(room)}`);
-    me = { name: `${group} 리더`, leader: true };
-    saveMe(me);
-    openStore().join(me.name!);
-    showQr();
+    const form = e.target as HTMLFormElement;
+    const btn = form.querySelector('button')!;
+    const f = new FormData(form);
+    const group = String(f.get('group')).trim().replace(/[\s/]+/g, '');
+    btn.disabled = true; btn.textContent = '여는 중…';
+    try {
+      room = await openRoom({ gbsKey: data.key, group, pin: String(f.get('pin')), first: firstQ });
+      history.replaceState(null, '', `?room=${encodeURIComponent(room)}${emu}`);
+      me = { name: `${group} 리더`, leader: true };
+      saveMe(me);
+      await openStore();
+      showQr();
+    } catch (err) {
+      toast(err instanceof RoomError ? err.message : '방을 열지 못했어요.');
+    } finally {
+      btn.disabled = false; btn.textContent = '나눔방 열기';
+    }
   });
 
   // ── 화면 ②: QR
   async function showQr() {
     setGroupLabels();
-    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}`;
+    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room)}${emu}`;
     $('[data-qr]').innerHTML = await QRCode.toString(url, { type: 'svg', margin: 0, color: { dark: '#1d1d1f', light: '#ffffff00' } });
     $('[data-code]').textContent = room;
     store!.subscribe((s) => {
@@ -216,7 +246,7 @@ const data = {
     const list = s.messages.filter((m) => m.q === s.current);
     const thread = $('[data-thread]');
     thread.innerHTML = list.length
-      ? list.map((m) => bubble(m, m.name === me.name, !!me.leader)).join('')
+      ? list.map((m) => bubble(m, m.uid && store?.uid ? m.uid === store.uid : m.name === me.name, !!me.leader)).join('')
       : '<li class="empty">아직 남긴 글이 없어요</li>';
     const prayers = s.messages.filter((m) => m.prayer);
     $('[data-pray-count]').textContent = String(prayers.length);
@@ -236,6 +266,7 @@ const data = {
   }
   function enterRoom() {
     setGroupLabels();
+    if (store?.isLeader !== undefined) me.leader = store.isLeader;
     $$('[data-leader-only]').forEach((el) => (el.hidden = !me.leader));
     store!.subscribe(render);
     show('room');
@@ -286,7 +317,7 @@ const data = {
   // ── 시안 미리보기용 예시 데이터
   function seedDemo() {
     room = '3순-K7QX';
-    const s = openStore();
+    const s = openLocal();
     const q = data.questions;
     const t = Date.now();
     s.seed({
@@ -314,8 +345,13 @@ const data = {
     else if (demo === 'pick') { enterRoom(); $('[data-sheet]').hidden = false; }
     else enterRoom();
   } else if (room) {
-    openStore();
-    if (me.name) enterRoom(); else { setGroupLabels(); show('join'); }
+    setGroupLabels();
+    openStore()
+      .then(() => { if (me.name) enterRoom(); else show('join'); })
+      .catch((err) => {
+        $('[data-missing-msg]').textContent = err instanceof RoomError ? err.message : '방에 연결하지 못했어요.';
+        show('missing');
+      });
   } else {
     show('start');
   }
@@ -323,7 +359,7 @@ const data = {
 
 <style is:global>
   body.bare main { padding-bottom: 0; }
-  [data-screen][hidden], .sheet[hidden] { display: none !important; }
+  [data-screen][hidden], .sheet[hidden], [data-leader-only][hidden] { display: none !important; }
 
   .screen { padding: 8px 0 40px; }
   .back { display: inline-block; margin: 4px 0 12px; color: var(--accent); font-weight: 600; text-decoration: none; }
@@ -445,4 +481,12 @@ const data = {
   .pray-list strong { display: block; font-size: .78rem; color: var(--accent); }
   .card.pray-list { padding: 12px; margin: 0 0 16px; }
   .card.pray-list li { border: 0; background: var(--surface-2); }
+  .toast {
+    position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 60;
+    padding: 12px 18px; border-radius: 16px; max-width: calc(100% - 32px);
+    background: var(--ink); color: var(--ink-text); font-size: .9rem; font-weight: 600; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.2);
+  }
+  .toast[hidden] { display: none; }
+  button:disabled { opacity: .6; }
 </style>

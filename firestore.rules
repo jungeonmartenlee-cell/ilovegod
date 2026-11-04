@@ -1,58 +1,71 @@
 rules_version = '2';
 // 소그룹 나눔방 보안 규칙
-// - 방 코드(rooms/{roomId})를 아는 사람만 그 방을 볼 수 있어요. 방 목록은 아무도 못 봐요.
-// - 방은 리더 비밀번호(config/leader)를 아는 리더만 열 수 있어요. 비밀번호는 아무도 읽을 수 없어요.
-// - 질문 바꾸기·나눔 마치기·글 지우기는 그 방을 연 리더만 할 수 있어요.
-// - 글은 300자까지, 닫힌 방에는 쓸 수 없어요.
+// - 방 코드를 아는 사람만 그 방을 볼 수 있어요. 방 목록은 아무도 못 봐요.
+// - 방은 리더 비밀번호(config/leader 의 pin)를 아는 사람만 열 수 있어요. 비밀번호는 아무도 읽을 수 없어요.
+// - 질문 바꾸기 · 나눔 마치기 · 글 지우기는 그 방을 연 리더만 할 수 있어요.
+// - 한국 시간 자정(expireAt)이 지나면 방과 글을 아무도 볼 수 없어요.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
-    function room(roomId) { return get(/databases/$(database)/documents/rooms/$(roomId)).data; }
-    function isLeader(roomId) { return signedIn() && room(roomId).leaderUid == request.auth.uid; }
+    function roomDoc(roomId) { return get(/databases/$(database)/documents/rooms/$(roomId)).data; }
+    function alive(roomId) { return roomDoc(roomId).expireAt > request.time; }
+    function isLeader(roomId) { return signedIn() && roomDoc(roomId).leaderUid == request.auth.uid; }
+    // 쓰기 검사는 '이번 요청이 끝난 뒤'의 방을 기준으로 (방 열기와 리더 입장을 한 번에 처리하기 때문)
+    function roomAfter(roomId) { return getAfter(/databases/$(database)/documents/rooms/$(roomId)).data; }
+    function aliveAfter(roomId) { return roomAfter(roomId).expireAt > request.time; }
+    function sameExpiry(roomId) { return request.resource.data.expireAt == roomAfter(roomId).expireAt; }
+    function leaderPin() { return get(/databases/$(database)/documents/config/leader).data.pin; }
 
-    // 리더 비밀번호 — 콘솔에서 직접 넣고, 앱에서는 읽지도 쓰지도 못해요
     match /config/{doc} {
       allow read, write: if false;
     }
 
     match /rooms/{roomId} {
-      allow get: if signedIn();
+      allow get: if signedIn() && resource.data.expireAt > request.time;
       allow list: if false;
 
-      // 방 열기: 같은 요청에서 private/leader 문서에 맞는 비밀번호를 함께 써야 해요
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['gbsKey', 'group', 'leaderUid', 'current', 'closed', 'createdAt', 'expireAt'])
         && request.resource.data.leaderUid == request.auth.uid
         && request.resource.data.closed == false
-        && getAfter(/databases/$(database)/documents/rooms/$(roomId)/private/leader).data.pin
-           == get(/databases/$(database)/documents/config/leader).data.pin;
+        && request.resource.data.expireAt is timestamp
+        && request.resource.data.expireAt > request.time
+        && request.resource.data.expireAt < request.time + duration.value(25, 'h')
+        && getAfter(/databases/$(database)/documents/rooms/$(roomId)/private/leader).data.pin == leaderPin();
 
-      // 리더만: 지금 질문 바꾸기, 나눔 마치기
-      allow update: if isLeader(roomId)
+      allow update: if isLeader(roomId) && resource.data.expireAt > request.time
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['current', 'closed']);
 
       match /private/{doc} {
         allow create: if signedIn()
           && request.resource.data.uid == request.auth.uid
-          && request.resource.data.pin == get(/databases/$(database)/documents/config/leader).data.pin;
+          && request.resource.data.pin == leaderPin();
         allow read, update, delete: if false;
       }
 
       match /members/{uid} {
-        allow read: if signedIn();
-        allow create, update: if signedIn() && uid == request.auth.uid
+        allow read: if signedIn() && alive(roomId);
+        allow create, update: if signedIn() && uid == request.auth.uid && aliveAfter(roomId)
+          && request.resource.data.keys().hasOnly(['name', 'expireAt'])
           && request.resource.data.name is string
-          && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 20;
+          && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 20
+          && sameExpiry(roomId);
       }
 
       match /messages/{msgId} {
-        allow read: if signedIn();
-        allow create: if signedIn()
-          && room(roomId).closed == false
+        allow read: if signedIn() && alive(roomId);
+        allow create: if signedIn() && alive(roomId)
+          && roomDoc(roomId).closed == false
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'text', 'q', 'prayer', 'at', 'expireAt'])
           && request.resource.data.uid == request.auth.uid
+          && request.resource.data.name is string && request.resource.data.name.size() <= 20
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 300
-          && request.resource.data.prayer is bool;
+          && request.resource.data.q is string && request.resource.data.q.size() <= 20
+          && request.resource.data.prayer is bool
+          && request.resource.data.at == request.time
+          && sameExpiry(roomId);
         allow delete: if isLeader(roomId);
         allow update: if false;
       }
