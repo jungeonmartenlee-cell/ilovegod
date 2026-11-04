@@ -3,7 +3,7 @@
 청년 공동체들을 위한 홈페이지입니다. QR코드로 휴대폰에서 접속해서, 주일 설교 후 소그룹에서 함께 나누는 **GBS(Group Bible Study)** 자료와 공동체 소개를 봐요.
 **한 사이트 안에 여러 공동체가 각자의 주소를 가지고** 들어갈 수 있어요.
 
-사이트 주소: https://ilovegod-intl.netlify.app
+사이트 주소: https://ilovegod-intl.web.app
 
 ## 주소 구조
 
@@ -41,7 +41,7 @@
 2. 새 파일 안의 `names`, 소개 문구, 예배 시간 등을 고쳐요. `order` 숫자로 메인 목록에서의 순서를 정해요.
 3. `src/content/gbs/shalom/` 폴더를 만들고 GBS 자료를 넣어요.
 4. GitHub에 저장하면 메인 목록에 새 공동체가 자동으로 나타나요.
-5. QR코드는 `https://ilovegod-intl.netlify.app/shalom/gbs/latest`로 만들어요.
+5. QR코드는 `https://ilovegod-intl.web.app/shalom/gbs/latest`로 만들어요.
 
 ## 성경 본문 저작권 안내
 개역개정 성경은 대한성서공회에 저작권이 있어요. 매주 몇 구절 정도 인용하는 것은 일반적으로 문제가 되지 않지만, 장 전체를 계속 싣는 것은 피하는 게 좋아요.
