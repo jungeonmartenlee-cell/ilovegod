@@ -1,0 +1,26 @@
+# GitHub main 브랜치에 올리면 Firebase 사이트가 자동으로 바뀌어요.
+# 처음 한 번, GitHub 저장소 Settings → Secrets 에 FIREBASE_SERVICE_ACCOUNT 를 등록해야 해요.
+name: Firebase 배포
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ilovegod-intl
+          channelId: live
