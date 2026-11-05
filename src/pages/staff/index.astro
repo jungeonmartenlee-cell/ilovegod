@@ -22,7 +22,7 @@ const items = all.map((g) => {
 });
 const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 ---
-<BaseLayout title="교역자 검수" bare hideHeader>
+<BaseLayout title="교역자 검수" bare>
   <script type="application/json" id="staff-data" set:html={JSON.stringify({ items, names })} />
   <div class="staff">
     <header class="topbar">
@@ -71,6 +71,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   function frame(opts: { title?: string; step?: [number, number]; body: string; primary?: [string, () => void]; secondary?: [string, () => void]; back?: () => void }) {
     titleEl.textContent = opts.title ?? '';
     back = opts.back ?? null; backBtn.hidden = !back;
+    document.querySelector<HTMLElement>('.staff .topbar')!.hidden = !back && !opts.title;
     progress.hidden = !opts.step;
     if (opts.step) progress.querySelector('span')!.style.width = `${(opts.step[0] / opts.step[1]) * 100}%`;
     view.innerHTML = `<section class="screen">${opts.body}</section>`;
@@ -130,10 +131,14 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         <ul class="rows">${mineItems.map((it) => {
           const s = status(it);
           const pullable = (approvals[it.id] ?? []).some((c) => mine.includes(c));
-          return `<li class="row-wrap"><button type="button" class="row-main" data-open="${it.id}">
-            <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span></span>
-            <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span></button>
-            ${pullable ? `<button type="button" class="pull-btn" data-pull="${it.id}">거둬들이기</button>` : ''}</li>`;
+          return `<li class="item-card">
+            <button type="button" class="item-open" data-open="${it.id}">
+              <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span></span>
+            </button>
+            <div class="chips">
+              <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span>
+              ${pullable ? `<button type="button" class="chip pull" data-pull="${it.id}">거둬들이기</button>` : ''}
+            </div></li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>`,
       secondary: ['로그아웃', () => signOut(auth)],
     });
@@ -141,23 +146,33 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
   }
 
-  // ── 거둬들이기 (배포 중지) — 확인 화면 한 번
-  function pullScreen(it: Item) {
+  // ── 거둬들이기 (배포 중지) — 작은 확인 창
+  function pullScreen(it: Item, after: () => void = listScreen) {
     const targets = (approvals[it.id] ?? []).filter((c) => mine.includes(c));
-    const where = targets.map((c) => esc(names[c] ?? c)).join(', ');
-    frame({
-      title: '거둬들이기', back: listScreen,
-      body: `<h1 class="big-title">${esc(eul(it.title))}<br />${where}에서 거둬들일까요?</h1>
-        <p class="lead">거둬들이면 공동체 화면에서 바로 사라져요.<br />언제든 다시 승인해서 배포할 수 있어요.</p>
-        <div class="summary-card"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.preacher)}</span></div>`,
-      primary: ['거둬들이기', () => busy(async () => {
+    const where = targets.map((c) => names[c] ?? c).join(', ');
+    const dlg = document.createElement('div');
+    dlg.className = 'dialog-backdrop';
+    dlg.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t">
+        <h2 id="dlg-t">${esc(eul(it.title))} ${esc(where)}에서<br />거둬들일까요?</h2>
+        <p>공동체 화면에서 바로 사라져요.<br />언제든 다시 배포할 수 있어요.</p>
+        <div class="dialog-actions">
+          <button type="button" class="dlg-cancel">취소</button>
+          <button type="button" class="dlg-ok">거둬들이기</button>
+        </div></div>`;
+    document.body.append(dlg);
+    requestAnimationFrame(() => dlg.classList.add('on'));
+    const close = () => { dlg.classList.remove('on'); setTimeout(() => dlg.remove(), 200); };
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+    dlg.querySelector<HTMLButtonElement>('.dlg-cancel')!.onclick = close;
+    const ok = dlg.querySelector<HTMLButtonElement>('.dlg-ok')!;
+    ok.onclick = async () => {
+      ok.disabled = true; ok.textContent = '처리 중…';
+      try {
         for (const c of targets) await deleteDoc(doc(db, 'approvals', `${it.id}~${c}`));
         approvals = await loadApprovals();
-        toast(`${where}에서 거둬들였어요`);
-        listScreen();
-      })],
-      secondary: ['취소', listScreen],
-    });
+        close(); toast(`${where}에서 거둬들였어요`); after();
+      } catch { ok.disabled = false; ok.textContent = '거둬들이기'; toast('처리하지 못했어요. 권한이나 인터넷 연결을 확인해 주세요.'); }
+    };
   }
 
   // ── 3. 검수 단계 (한 화면에 하나씩)
@@ -261,10 +276,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 
 <style is:global>
   body.bare main { padding: 0 0 150px; }
-  .staff .topbar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 54px; margin: 0 -12px; background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+  .staff .topbar { position: sticky; top: 54px; z-index: 15; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 54px; margin: 0 -12px; background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
   .staff .topbar-title { text-align: center; font-weight: 700; font-size: .95rem; color: var(--muted); }
   .staff .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); cursor: pointer; }
   .staff .icon-btn[hidden] { visibility: hidden; display: grid; }
+  .staff .topbar[hidden] { display: none; }
   .staff .icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .staff .progress { height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 0 0 8px; }
   .staff .progress[hidden] { display: none; }
@@ -289,14 +305,12 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .songs { display: flex; flex-wrap: wrap; gap: 8px; }
   .staff .songs span { padding: 8px 14px; border-radius: 999px; background: var(--card); border: 0.5px solid var(--line); font-weight: 600; }
   .staff .rows { display: grid; gap: 10px; }
-  .staff .row-wrap { display: flex; align-items: stretch; gap: 8px; }
-  .staff .row-main { flex: 1; min-width: 0; }
-  .staff .pull-btn {
-    flex: none; align-self: center; padding: 10px 14px; border-radius: 14px; cursor: pointer;
-    border: 0.5px solid var(--line); background: var(--card); color: #e5484d; font: inherit; font-size: .88rem; font-weight: 700;
-  }
-  .staff .pull-btn:active { transform: scale(.96); }
-  .staff .rows button.row-main { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+  .staff .item-card { padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); }
+  .staff .item-open { width: 100%; padding: 0; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+  .staff .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+  .staff button.chip { border: 0; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
+  .staff .chip.pull { background: rgba(229, 72, 77, 0.1); color: #e5484d; }
+  .staff .chip.pull:active { transform: scale(.95); }
   .staff .rows .txt { display: flex; flex-direction: column; }
   .staff .rows strong { font-size: 1.1rem; }
   .staff .rows .txt span { font-size: .85rem; color: var(--muted); }
@@ -314,6 +328,17 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .cta { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 25; width: min(100%, 640px); padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 4px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
   .staff .btn.big { width: 100%; min-height: 56px; border-radius: 18px; font-size: 1.05rem; }
   .staff .text-btn { padding: 12px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .dialog-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0); transition: background .2s ease; }
+  .dialog-backdrop.on { background: rgba(0, 0, 0, .32); }
+  .dialog { width: min(100%, 320px); padding: 24px 20px 16px; border-radius: 24px; background: var(--card); text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.2); transform: scale(.94); opacity: 0; transition: all .2s ease; }
+  .dialog-backdrop.on .dialog { transform: none; opacity: 1; }
+  .dialog h2 { margin: 0 0 8px; font-size: 1.15rem; font-weight: 800; line-height: 1.45; letter-spacing: -0.03em; }
+  .dialog p { margin: 0 0 20px; font-size: .9rem; line-height: 1.6; color: var(--muted); }
+  .dialog-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dialog-actions button { min-height: 48px; border-radius: 14px; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+  .dlg-cancel { background: var(--surface-2); color: var(--text); }
+  .dlg-ok { background: #e5484d; color: #fff; }
+  .dlg-ok:disabled { opacity: .6; }
   .toast { position: fixed; left: 50%; bottom: 120px; transform: translate(-50%, 10px); z-index: 60; padding: 12px 18px; border-radius: 16px; background: var(--ink); color: var(--ink-text); font-weight: 600; font-size: .9rem; opacity: 0; pointer-events: none; transition: all .2s ease; max-width: calc(100% - 32px); text-align: center; }
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
 </style>
