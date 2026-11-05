@@ -21,7 +21,7 @@
     ],
     "headers": [
       {
-        "source": "/*/gbs/latest{,/**}",
+        "regex": "^/(?!_astro/).*$",
         "headers": [
           {
             "key": "Cache-Control",
