@@ -7,5 +7,6 @@ import { defineCommunity } from './types';
 
 export default defineCommunity({
   names: ['하손내빚', 'GIL', 'REMNANT', 'ORYUN'],
+  tagline: '하나님의 손이 내 인생을 빚어간다 GIL 제자반',
   order: 2,
 });

@@ -15,7 +15,10 @@ const contact = community?.contact ?? {};
         {contact.kakao && <a href={contact.kakao}>카카오톡</a>}
       </p>
     )}
-    <p class="brand"><a href="/">{BRAND}</a></p>
+    <div class="brand-row">
+      <p class="brand"><a href="/">{BRAND}</a></p>
+      <p class="legal"><a href="/terms">이용약관</a><span>·</span><a href="/privacy">개인정보 처리방침</a></p>
+    </div>
   </div>
 </footer>
 
@@ -27,4 +30,9 @@ const contact = community?.contact ?? {};
   .links { display: flex; gap: 14px; }
   .links a { color: var(--muted); }
   .brand a { text-decoration: none; }
+  .brand-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .brand-row p { margin: 0; }
+  .legal { font-size: .72rem; opacity: .8; white-space: nowrap; }
+  .legal a { color: inherit; text-decoration: none; }
+  .legal span { margin: 0 5px; }
 </style>

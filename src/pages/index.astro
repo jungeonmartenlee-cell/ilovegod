@@ -39,7 +39,6 @@ const cards = await Promise.all(
   </ul>
 
   <div class="bottom-row">
-    <p class="legal"><a href="/terms">이용약관</a><span>·</span><a href="/privacy">개인정보 처리방침</a></p>
     <a class="staff-btn" href="/staff">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.6-3.6 3.6-6 7.5-6s6.9 2.4 7.5 6" /></svg>
       교역자
@@ -67,7 +66,7 @@ const cards = await Promise.all(
   .label { font-size: .75rem; font-weight: 700; color: var(--accent); }
   .gbs { margin-top: 2px; font-weight: 600; }
   .date { font-size: .82rem; color: var(--faint); }
-  .bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 56px; }
+  .bottom-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 56px; }
   .legal { margin: 0; font-size: .72rem; color: var(--faint); opacity: .8; }
   .legal a { color: inherit; text-decoration: none; }
   .legal span { margin: 0 6px; }
