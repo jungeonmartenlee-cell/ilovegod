@@ -36,20 +36,30 @@ const fullTitle = title
     <!-- 화면이 그려지기 전에 라이트/다크를 정해서 깜빡이지 않게 -->
     <script is:inline>
       (function () {
-        var saved = null;
-        try { saved = localStorage.getItem('theme'); } catch (e) {}
+        // 고른 모드 저장 — 브라우저가 저장을 막아도 같은 창 안에서는 유지되도록 여러 곳에 남겨요
+        function read() {
+          try { var v = localStorage.getItem('theme'); if (v) return v; } catch (e) {}
+          try { var w = sessionStorage.getItem('theme'); if (w) return w; } catch (e) {}
+          var m = /(?:^|; )theme=(light|dark)/.exec(document.cookie || '');
+          if (m) return m[1];
+          var n = /(?:^|;)theme:(light|dark)/.exec(window.name || '');
+          return n ? n[1] : null;
+        }
+        function save(t) {
+          try { localStorage.setItem('theme', t); } catch (e) {}
+          try { sessionStorage.setItem('theme', t); } catch (e) {}
+          try { document.cookie = 'theme=' + t + '; path=/; max-age=31536000; samesite=lax'; } catch (e) {}
+          window.name = (window.name || '').replace(/(^|;)theme:(light|dark)/g, '') + ';theme:' + t;
+        }
         var mq = window.matchMedia('(prefers-color-scheme: dark)');
         function apply(t) {
           document.documentElement.dataset.theme = t;
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute('content', t === 'dark' ? '#000000' : '#f2f2f7');
         }
-        apply(saved || (mq.matches ? 'dark' : 'light'));
-        mq.addEventListener && mq.addEventListener('change', function (e) {
-          var s2 = null; try { s2 = localStorage.getItem('theme'); } catch (err) {}
-          if (!s2) apply(e.matches ? 'dark' : 'light');
-        });
-        window.__setTheme = function (t) { try { localStorage.setItem('theme', t); } catch (e) {} apply(t); };
+        apply(read() || (mq.matches ? 'dark' : 'light'));
+        if (mq.addEventListener) mq.addEventListener('change', function (e) { if (!read()) apply(e.matches ? 'dark' : 'light'); });
+        window.__setTheme = function (t) { save(t); apply(t); };
       })();
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
