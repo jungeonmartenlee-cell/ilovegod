@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -24,3 +26,16 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: ilovegod-intl
           channelId: live
+      # 서버 함수(functions 폴더)가 바뀌었을 때만 함수도 다시 배포해요
+      - name: 바뀐 곳 확인
+        id: changed
+        run: echo "functions=$(git diff --name-only HEAD~1 HEAD -- functions firebase.json | wc -l)" >> "$GITHUB_OUTPUT"
+      - name: 서버 함수 배포
+        if: steps.changed.outputs.functions != '0' || github.event_name == 'workflow_dispatch'
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npm ci --prefix functions
+          npx -y firebase-tools@14 deploy --only functions --project ilovegod-intl --force --non-interactive

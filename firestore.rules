@@ -61,27 +61,6 @@ service cloud.firestore {
       allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
     }
 
-    // 설교 원고 — 교역자가 맡은 공동체용으로 올리고, 본인과 운영자만 볼 수 있어요
-    match /sermons/{id} {
-      allow create: if isStaff()
-        && request.resource.data.keys().hasOnly(['date', 'service', 'title', 'passage', 'preacher', 'text', 'communities', 'note', 'by', 'at', 'status'])
-        && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && request.resource.data['service'] is string && request.resource.data['service'].size() <= 40
-        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
-        && request.resource.data.passage is string && request.resource.data.passage.size() <= 80
-        && request.resource.data.preacher is string && request.resource.data.preacher.size() <= 80
-        && request.resource.data.text is string && request.resource.data.text.size() >= 200 && request.resource.data.text.size() <= 60000
-        && request.resource.data.communities is list && request.resource.data.communities.size() > 0
-        && staffDoc().communities.hasAll(request.resource.data.communities)
-        && request.resource.data.note is string && request.resource.data.note.size() <= 1000
-        && request.resource.data.by == request.auth.token.email
-        && request.resource.data.at == request.time
-        && request.resource.data.status == 'submitted';
-      allow read: if isStaff() && (resource.data.by == request.auth.token.email || isAdmin());
-      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && request.resource.data.status in ['submitted', 'drafted', 'done'];
-    }
-
     // 수정 요청 메모 — 교역자만 쓰고 읽어요
     match /feedback/{id} {
       allow read: if isStaff();

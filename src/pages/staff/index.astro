@@ -41,6 +41,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   import { doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
   import { auth, db } from '../../lib/firebase';
   import { loadApprovals } from '../../lib/approval';
+  import { makeGbs, submitGbs, aiError, type MadeGbs } from '../../lib/ai';
 
   type Item = {
     id: string; slug: string; review: boolean; targets: string[]; title: string; passage: string; preacher: string;
@@ -142,14 +143,12 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
             </div></li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>
         <ul class="menu">
-          <li><button type="button" data-sermons><span>${isAdmin ? '올라온 설교 원고 확인하기' : '내가 올린 설교 원고'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
-      primary: ['설교 원고 올리기', () => sermonStep(0, { communities: [...mine] })],
+      primary: ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })],
       secondary: ['로그아웃', () => signOut(auth)],
     });
-    view.querySelector<HTMLElement>('[data-sermons]')!.onclick = sermonsScreen;
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => newCommunity(0, {});
@@ -269,50 +268,34 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     };
   }
 
-  // ── 설교 원고 올리기 — 한 화면에 하나씩
-  type Sermon = { date?: string; service?: string; title?: string; passage?: string; preacher?: string; text?: string; fileName?: string; communities?: string[]; note?: string };
+  // ── 설교 원고 올리기 — 원고만 넣으면 Claude가 나눔지를 만들어요 (원고는 저장하지 않아요)
+  type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs };
   const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
-  const SSTEPS = 8;
-  const chev = '<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>';
+  const SSTEPS = 4;
+  let makeRun = 0;                    // 만드는 중에 뒤로 가면 이전 결과는 버려요
   function fieldError(msg: string) { const e = view.querySelector<HTMLElement>('.field-error')!; e.textContent = msg; e.hidden = false; }
   function sermonStep(step: number, d: Sermon) {
     const go = (n: number, patch: Sermon = {}) => sermonStep(n, { ...d, ...patch });
-    const common = { title: '설교 원고 올리기', step: [step + 1, SSTEPS + 1] as [number, number], back: step ? () => go(step - 1) : listScreen };
-    const input = (key: keyof Sermon, ph: string, type = 'text') =>
-      `<input class="field one" type="${type}" maxlength="80" placeholder="${ph}" value="${esc(String(d[key] ?? ''))}" /><p class="field-error" hidden></p>`;
-    const val = () => view.querySelector<HTMLInputElement>('.field')!.value.trim();
-    if (step === 0) frame({ ...common, body: `<h2 class="screen-title">언제 한 설교인가요?</h2><p class="lead">설교한 날짜를 골라 주세요.</p>${input('date', '', 'date')}`,
-      primary: ['다음', () => { const v = val(); if (!v) return fieldError('날짜를 골라 주세요'); go(1, { date: v }); }] });
-    if (step === 1) {
-      frame({ ...common, body: `<h2 class="screen-title">어느 예배의 설교인가요?</h2>
-        <ul class="checks pick">${SERVICES.map((x) => `<li><button type="button" class="pick-btn ${d.service === x ? 'on' : ''}" data-svc="${x}">${x}</button></li>`).join('')}</ul>
-        <p class="lead small">목록에 없으면 직접 적어 주세요.</p>${input('service', '예: 청년부 수련회')}`,
-        primary: ['다음', () => { const v = val(); if (!v) return fieldError('예배를 고르거나 적어 주세요'); go(2, { service: v }); }] });
-      view.querySelectorAll<HTMLElement>('[data-svc]').forEach((b) => (b.onclick = () => go(2, { service: b.dataset.svc })));
-    }
-    if (step === 2) frame({ ...common, body: `<h2 class="screen-title">설교 제목이 무엇인가요?</h2>${input('title', '예: 준비')}`,
-      primary: ['다음', () => { const v = val(); if (!v) return fieldError('제목을 적어 주세요'); go(3, { title: v }); }] });
-    if (step === 3) frame({ ...common, body: `<h2 class="screen-title">본문 말씀은요?</h2>${input('passage', '예: 창세기 22:4–14')}`,
-      primary: ['다음', () => { const v = val(); if (!v) return fieldError('본문을 적어 주세요'); go(4, { passage: v }); }] });
-    if (step === 4) frame({ ...common, body: `<h2 class="screen-title">설교자는 누구인가요?</h2>${input('preacher', '예: 이준건 목사')}`,
-      primary: ['다음', () => { const v = val(); if (!v) return fieldError('설교자를 적어 주세요'); go(5, { preacher: v }); }] });
-    if (step === 5) {
+    const common = { title: '설교 원고 올리기', step: [step + 1, SSTEPS] as [number, number], back: step ? () => go(step === 3 ? 0 : step - 1) : listScreen };
+    if (step === 0) {
       frame({ ...common, body: `<h2 class="screen-title">설교 원고를 넣어 주세요</h2>
-        <p class="lead">원고를 붙여 넣거나, 워드(.docx)·텍스트(.txt) 파일을 불러올 수 있어요.</p>
+        <p class="lead">원고만 넣으면 Claude(AI)가 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
         <label class="file-btn"><input type="file" accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
           <span>파일 불러오기</span></label>
         <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}</p>
         <textarea class="memo field big" maxlength="60000" placeholder="여기에 원고를 붙여 넣어 주세요">${esc(d.text ?? '')}</textarea>
         <p class="count"><span data-count>${(d.text ?? '').length.toLocaleString()}</span> / 60,000자</p>
-        <p class="field-error" hidden></p>`,
+        <p class="field-error" hidden></p>
+        <div class="privacy"><strong>원고는 저장하지 않아요</strong>
+          <span>원고는 나눔지를 만드는 데에만 쓰이고, 이 사이트 어디에도 저장되지 않아요. 운영자를 포함해 누구도 원고를 볼 수 없어요. Claude는 보낸 원고를 AI 학습에 쓰지 않아요.</span></div>`,
         primary: ['다음', () => {
           const v = view.querySelector<HTMLTextAreaElement>('.field')!.value.trim();
           if (v.length < 200) return fieldError('원고가 너무 짧아요. 원고 전체를 넣어 주세요');
-          go(6, { text: v });
+          go(1, { text: v });
         }] });
       const ta = view.querySelector<HTMLTextAreaElement>('.field')!;
-      ta.oninput = () => (view.querySelector('[data-count]')!.textContent = ta.value.length.toLocaleString());
+      ta.oninput = () => { view.querySelector('[data-count]')!.textContent = ta.value.length.toLocaleString(); view.querySelector<HTMLElement>('.field-error')!.hidden = true; };
       view.querySelector<HTMLInputElement>('input[type=file]')!.onchange = async (e) => {
         const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
         try {
@@ -331,75 +314,92 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         } catch { toast('파일을 읽지 못했어요. 내용을 복사해 붙여 넣어 주세요'); }
       };
     }
-    if (step === 6) {
-      if (mine.length === 1) return go(7, { communities: [...mine] });
+    if (step === 1) {
+      if (mine.length === 1) return go(2, { communities: [...mine] });
       frame({ ...common, body: `<h2 class="screen-title">어느 공동체의 나눔지로 만들까요?</h2><p class="lead">맡은 공동체 중에서 골라 주세요.</p>
         <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" ${(d.communities ?? []).includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
         <p class="field-error" hidden></p>`,
         primary: ['다음', () => {
           const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
           if (!picked.length) return fieldError('공동체를 하나 이상 골라 주세요');
-          go(7, { communities: picked });
+          go(2, { communities: picked });
         }] });
     }
-    if (step === 7) frame({ ...common, body: `<h2 class="screen-title">나눔지에 바라는 점이 있나요?</h2>
-        <p class="lead">강조할 내용, 적용 찬양, 질문 개수 등을 자유롭게 적어 주세요. 없으면 비워 두세요.</p>
+    if (step === 2) {
+      const ask = () => {
+        const note = view.querySelector<HTMLTextAreaElement>('.field')?.value.trim() ?? '';
+        generate({ ...d, note });
+      };
+      frame({ ...common, back: () => (mine.length === 1 ? go(0) : go(1)), body: `<h2 class="screen-title">나눔지에 바라는 점이 있나요?</h2>
+        <p class="lead">강조할 내용, 적용 찬양 등을 적어 주세요. 없으면 바로 만들어도 돼요.</p>
         <textarea class="memo field" maxlength="1000" placeholder="예: 새가족이 많으니 마음 열기 질문을 쉽게 해 주세요">${esc(d.note ?? '')}</textarea>`,
-      primary: ['다음', () => go(8, { note: view.querySelector<HTMLTextAreaElement>('.field')!.value.trim() })] });
-    if (step === 8) {
-      const row = (k: string, v?: string) => v ? `<div class="kv"><span>${k}</span><strong>${esc(v)}</strong></div>` : '';
-      frame({ ...common, body: `<h1 class="big-title">이대로 올릴까요?</h1>
-        <div class="preview-card col"><strong>${esc(d.title!)}</strong><span class="sub">${esc(d.passage!)} · ${esc(d.preacher!)}</span></div>
-        <div class="kvs">${row('날짜', d.date)}${row('예배', d.service)}${row('공동체', (d.communities ?? []).map((c) => names[c] ?? c).join(', '))}${row('원고', `${(d.text ?? '').length.toLocaleString()}자${d.fileName ? ` · ${d.fileName}` : ''}`)}${row('바라는 점', d.note)}</div>
-        <p class="lead">나눔지가 만들어지면 검수 목록에 나타나요.</p>`,
-        primary: ['원고 올리기', () => busy(async () => {
-          await addDoc(collection(db, 'sermons'), {
-            date: d.date, service: d.service, title: d.title, passage: d.passage, preacher: d.preacher,
-            text: d.text, communities: d.communities, note: d.note ?? '', by: user!.email, at: serverTimestamp(), status: 'submitted',
-          });
-          frame({
-            body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
-              <h1 class="big-title center">설교 원고를 올렸어요</h1>
-              <p class="lead center">${esc(d.title!)} · ${esc(d.passage!)}<br />나눔지가 만들어지면 검수 목록에 나타나요.</p>`,
-            primary: ['목록으로', listScreen],
-          });
-        })] });
+        primary: ['나눔지 만들기', ask] });
+    }
+    if (step === 3) confirmSermon(d);
+  }
+
+  async function generate(d: Sermon) {
+    const run = ++makeRun;
+    frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: () => { makeRun++; sermonStep(2, d); },
+      body: `<div class="making"><span class="spinner"></span></div>
+        <h1 class="big-title center">Claude가 나눔지를<br />만들고 있어요</h1>
+        <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>` });
+    try {
+      const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '');
+      if (run !== makeRun) return;
+      if (!gbs.date) gbs.date = today();
+      sermonStep(3, { ...d, gbs });
+    } catch (e) {
+      if (run !== makeRun) return;
+      console.error(e);
+      frame({ title: '설교 원고 올리기', back: () => sermonStep(2, d),
+        body: `<h1 class="big-title center" style="margin-top:20vh">나눔지를 만들지 못했어요</h1>
+          <p class="lead center">${esc(aiError(e, '인터넷 연결을 확인하고 다시 해 주세요.'))}</p>`,
+        primary: ['다시 만들기', () => generate(d)], secondary: ['목록으로', listScreen] });
     }
   }
 
-  const SSTATUS: Record<string, string> = { submitted: '나눔지 준비 중', drafted: '검수 대기', done: '완료' };
-  async function sermonsScreen() {
-    const ttl = isAdmin ? '올라온 설교 원고' : '내가 올린 설교 원고';
-    frame({ title: ttl, back: listScreen, body: '<p class="lead center">불러오는 중…</p>' });
-    const col = collection(db, 'sermons');
-    let list: any[] = [];
-    try {
-      const snap = await getDocs(isAdmin ? col : query(col, where('by', '==', user!.email)));
-      list = snap.docs.map((x) => ({ id: x.id, ...(x.data() as any) })).sort((a, b) => (b.at?.toMillis?.() ?? 0) - (a.at?.toMillis?.() ?? 0));
-    } catch { toast('불러오지 못했어요. 권한을 확인해 주세요'); }
-    const prompt = (r: any) => [
-      '아래 설교 원고로 GBS 나눔지를 만들어 주세요.',
-      `- 공동체: ${(r.communities ?? []).map((c: string) => `${names[c] ?? c}(${c})`).join(', ')}`,
-      `- 날짜: ${r.date} · ${r.service}`, `- 제목: ${r.title}`, `- 본문: ${r.passage}`, `- 설교자: ${r.preacher}`,
-      r.note ? `- 바라는 점: ${r.note}` : null, `- 원고 ID: ${r.id}`, '', '[설교 원고]', r.text,
-    ].filter((x) => x !== null).join('\n');
-    frame({
-      title: ttl, back: listScreen,
-      body: `<h1 class="big-title">${list.length ? `설교 원고 ${list.length}개` : '올라온 설교 원고가 없어요'}</h1>
-        <ul class="rows">${list.map((r) => `<li class="item-card">
-          <div class="txt"><strong>${esc(r.title)}</strong><span>${esc(r.passage)} · ${esc(r.date)} · ${esc(r.service)}</span>
-            <span>${(r.communities ?? []).map((c: string) => esc(names[c] ?? c)).join(', ')} · ${(r.text ?? '').length.toLocaleString()}자${isAdmin ? ` · ${esc(r.by)}` : ''}</span></div>
-          <div class="chips"><span class="chip ${r.status !== 'submitted' ? 'on' : ''}">${SSTATUS[r.status] ?? r.status}</span>
-            ${isAdmin ? `<button type="button" class="chip copy" data-copy-sermon="${r.id}">Claude에게 보낼 내용 복사</button>` : ''}
-            ${isAdmin && r.status === 'submitted' ? `<button type="button" class="chip" data-drafted="${r.id}">나눔지 작성 완료로 표시</button>` : ''}</div></li>`).join('')}</ul>`,
-    });
-    view.querySelectorAll<HTMLElement>('[data-copy-sermon]').forEach((b) => (b.onclick = async () => {
-      try { await navigator.clipboard.writeText(prompt(list.find((x) => x.id === b.dataset.copySermon))); toast('복사했어요. Claude 대화에 붙여 넣어 주세요'); }
-      catch { toast('복사가 안 되는 환경이에요'); }
-    }));
-    view.querySelectorAll<HTMLElement>('[data-drafted]').forEach((b) => (b.onclick = async () => {
-      try { await updateDoc(doc(db, 'sermons', b.dataset.drafted!), { status: 'drafted' }); toast('표시했어요'); sermonsScreen(); }
-      catch { toast('처리하지 못했어요'); }
+  // 나눔지에 적힌 설교 정보 확인 — 원고에서 못 찾은 칸만 채우면 돼요
+  function confirmSermon(d: Sermon) {
+    const g = d.gbs!;
+    const field = (key: 'title' | 'passage' | 'preacher' | 'date' | 'service', label: string, ph: string, type = 'text') =>
+      `<label class="kv-field"><span>${label}</span><input class="field" data-k="${key}" type="${type}" maxlength="${key === 'service' || key === 'preacher' ? 40 : 80}" placeholder="${ph}" value="${esc(g[key] ?? '')}" /></label>`;
+    frame({ title: '설교 원고 올리기', step: [4, SSTEPS], back: () => sermonStep(2, d),
+      body: `<h2 class="screen-title">이렇게 적었어요. 맞나요?</h2>
+        <p class="lead">원고에서 찾은 내용이에요. 비어 있거나 틀린 칸만 고쳐 주세요.</p>
+        <div class="kv-fields">
+          ${field('title', '제목', '설교 제목')}
+          ${field('passage', '본문', '예: 창세기 22:4–14')}
+          ${field('preacher', '설교자', '예: 이준건 목사')}
+          ${field('date', '날짜', '', 'date')}
+          ${field('service', '예배', '없으면 비워 둬도 돼요')}
+        </div>
+        <ul class="svc-chips">${SERVICES.map((x) => `<li><button type="button" class="chip" data-svc="${x}">${x}</button></li>`).join('')}</ul>
+        <div class="preview-card col"><span class="sub">핵심 메시지</span><strong class="key">${esc(g.key)}</strong></div>
+        <p class="field-error" hidden></p>
+        <p class="lead small">올리면 검수 목록에 나타나요. 나눔지 내용은 거기서 한 단계씩 확인해 주세요.</p>`,
+      primary: ['검수 목록에 올리기', () => {
+        const v: any = {};
+        view.querySelectorAll<HTMLInputElement>('[data-k]').forEach((i) => (v[i.dataset.k!] = i.value.trim()));
+        if (!v.title) return fieldError('제목을 적어 주세요');
+        if (!v.passage) return fieldError('본문을 적어 주세요');
+        if (!v.preacher) return fieldError('원고에 설교자가 없어요. 설교자를 적어 주세요');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return fieldError('날짜를 골라 주세요');
+        const gbs = { ...g, ...v };
+        busy(async () => {
+          try {
+            await submitGbs(gbs, d.communities!);
+          } catch (e) { toast(aiError(e, '올리지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '검수 목록에 올리기'; } return; }
+          frame({
+            body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
+              <h1 class="big-title center">검수 목록에 올렸어요</h1>
+              <p class="lead center">${esc(gbs.title)} · ${esc(gbs.passage)}<br />사이트에 반영되기까지 3분쯤 걸려요.<br />그다음 이 화면을 새로 고치면 검수 목록에 나타나요.</p>`,
+            primary: ['새로 고치기', () => location.reload()], secondary: ['목록으로', listScreen],
+          });
+        });
+      }] });
+    view.querySelectorAll<HTMLElement>('[data-svc]').forEach((b) => (b.onclick = () => {
+      view.querySelector<HTMLInputElement>('[data-k="service"]')!.value = b.dataset.svc!;
     }));
   }
 
@@ -563,6 +563,19 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .file-name[hidden] { display: none; }
   .staff .count { margin: 6px 4px 0; text-align: right; font-size: .8rem; color: var(--faint); }
   .staff .preview-card.col { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .staff .privacy { margin-top: 18px; padding: 16px 18px; border-radius: 18px; background: var(--surface-2, var(--card)); display: grid; gap: 4px; }
+  .staff .privacy strong { font-size: .92rem; }
+  .staff .privacy span { font-size: .84rem; line-height: 1.6; color: var(--muted); }
+  .staff .making { display: grid; place-items: center; margin: 18vh 0 22px; }
+  .staff .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .staff .kv-fields { display: grid; gap: 10px; }
+  .staff .kv-field { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; }
+  .staff .kv-field span { font-size: .9rem; color: var(--muted); font-weight: 600; }
+  .staff .kv-field .field { margin: 0; width: 100%; min-width: 0; padding: 13px 15px; border-radius: 14px; border: 0.5px solid var(--line); background: var(--card); font: inherit; font-size: 1rem; color: var(--text); outline: none; -webkit-appearance: none; appearance: none; }
+  .staff .kv-field input[type=date] { min-height: 49px; }
+  .staff .svc-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px 74px; padding: 0; }
+  .staff .preview-card .key { font-size: 1.02rem; font-weight: 700; line-height: 1.55; }
   .staff .preview-card .sub { font-size: .9rem; letter-spacing: 0; color: var(--muted); font-weight: 500; }
   .staff .item-card .txt { display: flex; flex-direction: column; }
   .staff .item-card .txt span { font-size: .85rem; color: var(--muted); }
