@@ -9,6 +9,12 @@ export const BRAND = '하나님을 사랑합니다';
 // 메인 페이지 (/) 문구
 export const MAIN = {
   tagline: '설교 후, 함께 나누는 말씀',
-  intro: '주일 설교를 듣고 소그룹에서 함께 나누는 GBS(Group Bible Study) 자료를 공동체별로 모았어요. 우리 공동체를 찾아 들어가세요.',
+  // 소개글 — 한 줄씩 나눠 적으면 뜻이 끊기는 곳에서만 줄이 바뀌어요. 마지막 줄은 항상 새 줄에서 시작해요.
+  intro: [
+    '주일 설교를 듣고 소그룹에서 함께 나누는',
+    'GBS(Group Bible Study) 자료를',
+    '공동체별로 모았어요.',
+    '우리 공동체를 찾아 들어가세요.',
+  ],
   description: '하나님을 사랑합니다 — 공동체별 GBS(Group Bible Study) 나눔 자료',
 };
