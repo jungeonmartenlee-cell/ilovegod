@@ -281,8 +281,8 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     if (step === 0) {
       frame({ ...common, body: `<h2 class="screen-title">설교 원고를 넣어 주세요</h2>
         <p class="lead">원고만 넣으면 Claude(AI)가 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
-        <label class="file-btn"><input type="file" accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
-          <span>파일 불러오기</span></label>
+        <label class="file-btn"><input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+          <span>PDF·워드 파일 불러오기</span></label>
         <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}</p>
         <textarea class="memo field big" maxlength="60000" placeholder="여기에 원고를 붙여 넣어 주세요">${esc(d.text ?? '')}</textarea>
         <p class="count"><span data-count>${(d.text ?? '').length.toLocaleString()}</span> / 60,000자</p>
@@ -300,18 +300,22 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
         try {
           let text = '';
-          if (f.name.toLowerCase().endsWith('.docx')) {
+          const lower = f.name.toLowerCase();
+          if (lower.endsWith('.pdf') || f.type === 'application/pdf') {
+            text = await pdfText(f);
+            if (text.replace(/\s/g, '').length < 100) return toast('글자를 읽을 수 없는 PDF예요(스캔한 파일 등). 원본 PDF나 워드 파일로 올려 주세요');
+          } else if (lower.endsWith('.docx')) {
             const mammoth: any = await import('mammoth/mammoth.browser.min.js');
             text = (await (mammoth.default ?? mammoth).extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
           } else if (f.name.toLowerCase().endsWith('.txt') || f.type.startsWith('text/')) {
             text = await f.text();
-          } else { return toast('워드(.docx)나 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 내용을 복사해 붙여 넣어 주세요'); }
+          } else { return toast('PDF, 워드(.docx), 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 PDF로 저장해서 올려 주세요'); }
           ta.value = text.replace(/\n{3,}/g, '\n\n').trim().slice(0, 60000);
           ta.oninput!(new Event('input'));
           d.fileName = f.name;
           const fn = view.querySelector<HTMLElement>('.file-name')!; fn.textContent = f.name; fn.hidden = false;
           toast('원고를 불러왔어요');
-        } catch { toast('파일을 읽지 못했어요. 내용을 복사해 붙여 넣어 주세요'); }
+        } catch (err) { console.error(err); toast('파일을 읽지 못했어요. 내용을 복사해 붙여 넣어 주세요'); }
       };
     }
     if (step === 1) {
@@ -336,6 +340,21 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         primary: ['나눔지 만들기', ask] });
     }
     if (step === 3) confirmSermon(d);
+  }
+
+  /** PDF에서 글자만 꺼내요 (내 기기 안에서만 읽고, 파일은 어디에도 보내지 않아요) */
+  async function pdfText(f: File): Promise<string> {
+    const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
+    const task = pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), cMapUrl: '/pdfjs/cmaps/', cMapPacked: true });
+    const pdf = await task.promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= Math.min(pdf.numPages, 60); i++) {
+      const tc = await (await pdf.getPage(i)).getTextContent();
+      pages.push(tc.items.map((it: any) => (it.str ?? '') + (it.hasEOL ? '\n' : '')).join(''));
+    }
+    await task.destroy();
+    return pages.join('\n\n');
   }
 
   async function generate(d: Sermon) {

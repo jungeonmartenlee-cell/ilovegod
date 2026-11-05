@@ -11,3 +11,4 @@ firebase-debug.log
 .secret.local
 functions/.secret.local
 functions/.env.local
+public/pdfjs/

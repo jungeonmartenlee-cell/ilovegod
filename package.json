@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
+    "prebuild": "rm -rf public/pdfjs && mkdir -p public/pdfjs && cp -r node_modules/pdfjs-dist/cmaps public/pdfjs/",
     "build": "astro build",
     "preview": "astro preview"
   },
@@ -12,6 +13,7 @@
     "astro": "^7.4.5",
     "firebase": "^12.19.0",
     "mammoth": "^1.13.0",
+    "pdfjs-dist": "^6.4.299",
     "pretendard": "^1.3.9",
     "qrcode": "^1.5.4"
   },
