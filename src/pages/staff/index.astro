@@ -271,7 +271,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 
   // ── 설교 원고 올리기 — 한 화면에 하나씩
   type Sermon = { date?: string; service?: string; title?: string; passage?: string; preacher?: string; text?: string; fileName?: string; communities?: string[]; note?: string };
-  const SERVICES = ['주일예배', '화요램넌트예배', '수요예배', '금요기도회'];
+  const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
   const SSTEPS = 8;
   const chev = '<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>';
@@ -386,7 +386,6 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({
       title: ttl, back: listScreen,
       body: `<h1 class="big-title">${list.length ? `설교 원고 ${list.length}개` : '올라온 설교 원고가 없어요'}</h1>
-        ${isAdmin ? '<p class="lead">"Claude에게 보낼 내용 복사"를 눌러 Claude 대화에 붙여 넣으면 나눔지를 만들어 검수 목록에 올려요.</p>' : ''}
         <ul class="rows">${list.map((r) => `<li class="item-card">
           <div class="txt"><strong>${esc(r.title)}</strong><span>${esc(r.passage)} · ${esc(r.date)} · ${esc(r.service)}</span>
             <span>${(r.communities ?? []).map((c: string) => esc(names[c] ?? c)).join(', ')} · ${(r.text ?? '').length.toLocaleString()}자${isAdmin ? ` · ${esc(r.by)}` : ''}</span></div>
