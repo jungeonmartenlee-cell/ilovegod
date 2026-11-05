@@ -17,8 +17,24 @@ const home = '/'; // 로고를 누르면 공동체 고르는 첫 화면으로
         {community?.namesLine && <span class="names">{community.namesLine}</span>}
       </span>
     </a>
+    <button type="button" class="theme-btn" data-theme-toggle aria-label="다크 모드 켜기/끄기">
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" /></svg>
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" /></svg>
+    </button>
   </div>
 </header>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((b) => {
+    const label = () => b.setAttribute('aria-label', document.documentElement.dataset.theme === 'dark' ? '라이트 모드로 바꾸기' : '다크 모드로 바꾸기');
+    label();
+    b.addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      (window as any).__setTheme(next);
+      label();
+    });
+  });
+</script>
 
 <style>
   header {
@@ -29,10 +45,19 @@ const home = '/'; // 로고를 누르면 공동체 고르는 첫 화면으로
     -webkit-backdrop-filter: var(--blur);
     backdrop-filter: var(--blur);
   }
-  .bar { display: flex; align-items: center; height: 54px; }
+  .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 54px; }
   .logo { display: flex; align-items: center; gap: 9px; text-decoration: none; min-width: 0; }
   .mark { flex: none; width: 20px; height: 20px; fill: var(--heart); }
   .words { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
   .brand { font-weight: 700; font-size: 1rem; letter-spacing: -0.035em; word-spacing: .1em; white-space: nowrap; }
   .names { font-size: .62rem; font-weight: 600; letter-spacing: .16em; color: var(--muted); white-space: nowrap; }
+  .theme-btn {
+    flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+    border: 0.5px solid var(--line); background: var(--card); color: var(--text);
+  }
+  .theme-btn:active { transform: scale(.94); }
+  .theme-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .theme-btn .sun { display: none; }
+  :global(:root[data-theme='dark']) .theme-btn .sun { display: block; }
+  :global(:root[data-theme='dark']) .theme-btn .moon { display: none; }
 </style>

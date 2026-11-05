@@ -41,9 +41,7 @@ const active = (href: string) =>
     border: 0.5px solid rgba(0, 0, 0, 0.06);
     box-shadow: 0 0.5px 0 rgba(255,255,255,.9) inset, 0 8px 28px rgba(0, 0, 0, 0.12);
   }
-  @media (prefers-color-scheme: dark) {
-    .tabbar { background: rgba(30, 30, 32, 0.72); border-color: rgba(255,255,255,.1); box-shadow: 0 8px 28px rgba(0,0,0,.5); }
-  }
+  :global(:root[data-theme='dark']) .tabbar { background: rgba(30, 30, 32, 0.72); border-color: rgba(255,255,255,.1); box-shadow: 0 8px 28px rgba(0,0,0,.5); }
   a {
     display: flex;
     flex-direction: column;
