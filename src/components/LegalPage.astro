@@ -1,0 +1,25 @@
+---
+// 약관·방침 공통 틀
+import BaseLayout from '../layouts/BaseLayout.astro';
+interface Props { title: string; updated: string }
+const { title, updated } = Astro.props;
+---
+<BaseLayout title={title}>
+  <article class="legal-doc">
+    <h1>{title}</h1>
+    <p class="updated">시행일 {updated}</p>
+    <slot />
+  </article>
+</BaseLayout>
+
+<style>
+  .legal-doc { padding: 12px 0 40px; font-size: .95rem; line-height: 1.8; }
+  .legal-doc h1 { font-size: 1.7rem; margin: 12px 0 2px; }
+  .updated { margin: 0 0 28px; font-size: .82rem; color: var(--faint); }
+  .legal-doc :global(h2) { margin: 28px 0 8px; font-size: 1.05rem; font-weight: 800; }
+  .legal-doc :global(p), .legal-doc :global(li) { color: var(--muted); }
+  .legal-doc :global(ul), .legal-doc :global(ol) { padding-left: 1.2em; }
+  .legal-doc :global(table) { width: 100%; border-collapse: collapse; font-size: .88rem; margin: 8px 0; }
+  .legal-doc :global(th), .legal-doc :global(td) { padding: 8px; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; color: var(--muted); }
+  .legal-doc :global(th) { color: var(--text); font-weight: 700; }
+</style>

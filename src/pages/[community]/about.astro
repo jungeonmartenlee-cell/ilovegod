@@ -8,10 +8,11 @@ export function getStaticPaths() {
 const { community } = Astro.props as { community: CommunityEntry };
 
 // 이 페이지의 문구는 src/communities/공동체이름.ts 의 about 에서 바꿔요.
-const { mainName, parentNames, intro, attendance, worship, mapQuery } = community;
-const { vision, mascot, smallGroup, org, activities, peopleTitle, people, meetings, welcome, closing } = community.about;
+const { mainName, parentNames, intro, attendance, mapQuery } = community;
+const worship = community.worship ?? [];
+const { vision, mascot, smallGroup, org, activities, peopleTitle, people, meetings, welcome, closing } = { people: [], ...(community.about ?? {}) };
 // 이름이나 사진이 아직 없는 사람은 숨겨요
-const shown = people.filter((p) => p.name || p.photo);
+const shown = (people ?? []).filter((p) => p.name || p.photo);
 const featured = shown.filter((p) => p.featured);
 const others = shown.filter((p) => !p.featured);
 const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(mapQuery)}` : '';
@@ -51,7 +52,7 @@ const mapUrl = mapQuery ? `https://map.naver.com/p/search/${encodeURIComponent(m
     </div>
   )}
 
-  <h2 class="section-title">예배 안내</h2>
+  {worship.length > 0 && <h2 class="section-title">예배 안내</h2>}
   {worship.map((w) => (
     <dl class="card info">
       <div><dt>시간</dt><dd><strong>{w.time}</strong></dd></div>

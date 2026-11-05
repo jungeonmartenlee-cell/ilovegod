@@ -3,17 +3,17 @@
 export interface Community {
   /** 공동체 이름들 — 첫 번째가 대표 이름 (예: ['GIL', 'REMNANT', 'ORYUN']) */
   names: string[];
-  tagline: string;
-  intro: string;
+  tagline?: string;
+  intro?: string;
   attendance?: string;
   description?: string;
   /** 메인 페이지 공동체 목록에서의 순서 (작을수록 앞) */
   order?: number;
   /** 예배·모임 — order 는 예배 순서 (예: '찬양 → 설교 → 기도') */
-  worship: { label: string; time: string; place: string; order?: string }[];
+  worship?: { label: string; time: string; place: string; order?: string }[];
   /** 네이버 지도에서 검색할 장소 이름 (예: '오륜교회') */
   mapQuery?: string;
-  about: {
+  about?: {
     /** 공동체 이름의 뜻 / 비전 */
     vision?: {
       title?: string;
@@ -39,7 +39,7 @@ export interface Community {
     };
     /** 섬기는 사람들 — photo 는 public/images/ 안의 파일 이름, featured 는 크게 보이기 */
     peopleTitle?: string;
-    people: { role: string; name?: string; note?: string; photo?: string; featured?: boolean }[];
+    people?: { role: string; name?: string; note?: string; photo?: string; featured?: boolean }[];
     /** 소개 페이지 맨 아래 마무리 문구 */
     closing?: { title: string; text: string; verse?: string; ref?: string };
     meetings?: { name: string; desc: string }[];

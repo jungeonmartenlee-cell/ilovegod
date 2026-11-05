@@ -4,10 +4,9 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { BRAND, MAIN } from '../config';
 import { communities } from '../communities';
-import { getSortedGbs, formatDate, gate } from '../lib/gbs';
 
 const cards = await Promise.all(
-  communities.map(async (c) => ({ c, items: await getSortedGbs(c.slug) })),
+  communities.map(async (c) => ({ c })),
 );
 ---
 <BaseLayout>
@@ -22,7 +21,7 @@ const cards = await Promise.all(
 
   <h2 class="section-title">공동체</h2>
   <ul class="list">
-    {cards.map(({ c, items }) => (
+    {cards.map(({ c }) => (
       <li>
         <a class="card community" href={`/${c.slug}`}>
           <span class="top">
@@ -32,23 +31,20 @@ const cards = await Promise.all(
             </span>
             <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
-          <span class="tag">{c.tagline}</span>
-          {items.map((latest) => (
-            <span class="latest" data-first-of={`main-${c.slug}`} {...gate(latest, c.slug)}>
-              <span class="label">이번 주 GBS</span>
-              <span class="gbs">{latest.data.title}</span>
-              <span class="date">{latest.data.passage} · {formatDate(latest.data.date)}</span>
-            </span>
-          ))}
+          {c.tagline && <span class="tag">{c.tagline}</span>}
+
         </a>
       </li>
     ))}
   </ul>
 
-  <a class="staff-btn" href="/staff">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.6-3.6 3.6-6 7.5-6s6.9 2.4 7.5 6" /></svg>
-    교역자
-  </a>
+  <div class="bottom-row">
+    <p class="legal"><a href="/terms">이용약관</a><span>·</span><a href="/privacy">개인정보 처리방침</a></p>
+    <a class="staff-btn" href="/staff">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.6-3.6 3.6-6 7.5-6s6.9 2.4 7.5 6" /></svg>
+      교역자
+    </a>
+  </div>
 </BaseLayout>
 
 <style>
@@ -69,9 +65,12 @@ const cards = await Promise.all(
   .label { font-size: .75rem; font-weight: 700; color: var(--accent); }
   .gbs { margin-top: 2px; font-weight: 600; }
   .date { font-size: .82rem; color: var(--faint); }
+  .bottom-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 56px; }
+  .legal { margin: 0; font-size: .72rem; color: var(--faint); opacity: .8; }
+  .legal a { color: inherit; text-decoration: none; }
+  .legal span { margin: 0 6px; }
   .staff-btn {
-    position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 30;
-    display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 999px;
+    flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 999px;
     background: var(--glass-strong); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
     border: 0.5px solid var(--line); box-shadow: 0 8px 24px rgba(0, 0, 0, .1);
     font-size: .88rem; font-weight: 700; color: var(--text); text-decoration: none;

@@ -44,6 +44,10 @@
 - 교역자 등록: Firebase → Firestore → `staff` 컬렉션 → 문서 ID에 **구글 이메일**, 필드 `communities`(배열)에 맡은 공동체 (예: `gil`)
 - 수정 요청 메모는 Firestore `feedback` 컬렉션에 쌓여요.
 
+### 🏛️ 공동체 개설 신청
+- 교역자가 `/staff` → **새 공동체 개설 신청**에서 이름·소속·주소 이름 등을 한 화면씩 입력해 신청해요. (Firestore `communityRequests`)
+- 운영자(staff 문서에 `admin: true`)는 **개설 신청 확인하기**에서 "내용 복사" → Claude에게 붙여 넣으면 공동체가 열려요.
+
 ### 🌱 새 공동체 추가하기
 1. `src/communities/gil.ts`를 복사해서 새 이름으로 저장해요. **파일 이름이 곧 주소예요.** (예: `shalom.ts` → `/shalom`, 영어 소문자 권장)
 2. 새 파일 안의 `names`, 소개 문구, 예배 시간 등을 고쳐요. `order` 숫자로 메인 목록에서의 순서를 정해요.

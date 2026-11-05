@@ -10,7 +10,8 @@ export function getStaticPaths() {
 }
 const { community } = Astro.props as { community: CommunityEntry };
 const base = `/${community.slug}`;
-const { mainName, parentNames, tagline, intro, worship } = community;
+const { mainName, parentNames, tagline, intro } = community;
+const worship = community.worship ?? [];
 
 const items = await getSortedGbs(community.slug);
 ---
@@ -36,21 +37,25 @@ const items = await getSortedGbs(community.slug);
 
   <section class="intro">
     {parentNames && <span class="names">{parentNames}</span>}
-    <h2>{mainName}<span class="tag">{tagline}</span></h2>
-    <p class="muted">{intro}</p>
+    <h2>{mainName}{tagline && <span class="tag">{tagline}</span>}</h2>
+    {intro && <p class="muted">{intro}</p>}
     <a href={`${base}/about`} class="link">공동체 소개 <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
   </section>
 
-  <h2 class="section-title">예배 안내</h2>
-  <div class="group">
-    {worship.map((w) => (
-      <div class="worship">
-        <span class="w-label">{w.label}</span>
-        <strong>{w.time}</strong>
-        <span class="muted">{w.place}</span>
+  {worship.length > 0 && (
+    <>
+      <h2 class="section-title">예배 안내</h2>
+      <div class="group">
+        {worship.map((w) => (
+          <div class="worship">
+            <span class="w-label">{w.label}</span>
+            <strong>{w.time}</strong>
+            <span class="muted">{w.place}</span>
+          </div>
+        ))}
       </div>
-    ))}
-  </div>
+    </>
+  )}
 
 </BaseLayout>
 
