@@ -268,7 +268,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     };
   }
 
-  // ── 설교 원고 올리기 — 원고만 넣으면 Claude가 나눔지를 만들어요 (원고는 저장하지 않아요)
+  // ── 설교 원고 올리기 — 원고만 넣으면 스밈(AI)이 나눔지를 만들어요 (원고는 저장하지 않아요)
   type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs };
   const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
@@ -280,7 +280,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     const common = { title: '설교 원고 올리기', step: [step + 1, SSTEPS] as [number, number], back: step ? () => go(step === 3 ? 0 : step - 1) : listScreen };
     if (step === 0) {
       frame({ ...common, body: `<h2 class="screen-title">설교 원고를 넣어 주세요</h2>
-        <p class="lead">원고만 넣으면 Claude(AI)가 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
+        <p class="lead">원고만 넣으면 스밈(AI)이 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
         <label class="file-btn"><input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
           <span>PDF·워드 파일 불러오기</span></label>
         <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}</p>
@@ -288,7 +288,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         <p class="count"><span data-count>${(d.text ?? '').length.toLocaleString()}</span> / 60,000자</p>
         <p class="field-error" hidden></p>
         <div class="privacy"><strong>원고는 저장하지 않아요</strong>
-          <span>원고는 나눔지를 만드는 데에만 쓰이고, 이 사이트 어디에도 저장되지 않아요. 운영자를 포함해 누구도 원고를 볼 수 없어요. Claude는 보낸 원고를 AI 학습에 쓰지 않아요.</span></div>`,
+          <span>원고는 나눔지를 만드는 데에만 쓰이고, 이 사이트 어디에도 저장되지 않아요. 운영자를 포함해 누구도 원고를 볼 수 없어요. 보낸 원고는 AI 학습에도 쓰이지 않아요.</span></div>`,
         primary: ['다음', () => {
           const v = view.querySelector<HTMLTextAreaElement>('.field')!.value.trim();
           if (v.length < 200) return fieldError('원고가 너무 짧아요. 원고 전체를 넣어 주세요');
@@ -361,7 +361,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     const run = ++makeRun;
     frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: () => { makeRun++; sermonStep(2, d); },
       body: `<div class="making"><span class="spinner"></span></div>
-        <h1 class="big-title center">Claude가 나눔지를<br />만들고 있어요</h1>
+        <h1 class="big-title center">스밈이 나눔지를<br />만들고 있어요</h1>
         <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>` });
     try {
       const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '');

@@ -1,4 +1,4 @@
-// 교역자가 올린 설교 원고로 Claude가 GBS 나눔지를 만들어 주는 서버 함수
+// 교역자가 올린 설교 원고로 AI '스밈'(Anthropic Claude 사용)이 GBS 나눔지를 만들어 주는 서버 함수
 //
 //  makeGbs   : 원고 → 나눔지 내용(JSON). 원고는 어디에도 저장하지 않고, 기록(로그)에도 남기지 않아요.
 //  submitGbs : 교역자가 확인한 나눔지를 GitHub에 올려요 → 사이트가 자동으로 다시 만들어지고 검수 목록에 나타나요.
@@ -152,7 +152,7 @@ export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSe
   } catch (e) {
     if (e instanceof HttpsError) throw e;
     console.error('makeGbs error', e instanceof Anthropic.APIError ? `${e.status} ${e.name}` : String(e?.name));
-    throw new HttpsError('unavailable', 'Claude와 연결하지 못했어요. 잠시 뒤에 다시 해 주세요.');
+    throw new HttpsError('unavailable', '스밈이 지금 응답하지 않아요. 잠시 뒤에 다시 해 주세요.');
   }
 });
 
@@ -175,7 +175,7 @@ function toMarkdown(g, communities) {
     prayers: g.prayers,
     songs: g.songs,
   };
-  return `---\n# Claude가 설교 원고로 만든 나눔지 — 교역자 검수 후 공개돼요\n${stringify(data, { lineWidth: 0 })}---\n`;
+  return `---\n# 스밈(AI)이 설교 원고로 만든 나눔지 — 교역자 검수 후 공개돼요\n${stringify(data, { lineWidth: 0 })}---\n`;
 }
 
 async function gh(path, init = {}) {
