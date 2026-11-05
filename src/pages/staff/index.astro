@@ -55,6 +55,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   const backBtn = document.querySelector<HTMLButtonElement>('[data-back]')!;
   const progress = document.querySelector<HTMLElement>('[data-progress]')!;
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  /** 받침에 따라 을/를 (예: 준비를, 사랑을) */
+  const eul = (w: string) => {
+    const c = w.charCodeAt(w.length - 1) - 0xac00;
+    return c < 0 || c > 11171 ? `${w}을(를)` : `${w}${c % 28 ? '을' : '를'}`;
+  };
   const params = new URLSearchParams(location.search);
   const emu = params.has('emulator') ? '?emulator=1' : '';
 
@@ -124,13 +129,35 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')}</p>
         <ul class="rows">${mineItems.map((it) => {
           const s = status(it);
-          return `<li><button type="button" data-open="${it.id}">
+          const pullable = (approvals[it.id] ?? []).some((c) => mine.includes(c));
+          return `<li class="row-wrap"><button type="button" class="row-main" data-open="${it.id}">
             <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span></span>
-            <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span></button></li>`;
+            <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span></button>
+            ${pullable ? `<button type="button" class="pull-btn" data-pull="${it.id}">거둬들이기</button>` : ''}</li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>`,
       secondary: ['로그아웃', () => signOut(auth)],
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
+    view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
+  }
+
+  // ── 거둬들이기 (배포 중지) — 확인 화면 한 번
+  function pullScreen(it: Item) {
+    const targets = (approvals[it.id] ?? []).filter((c) => mine.includes(c));
+    const where = targets.map((c) => esc(names[c] ?? c)).join(', ');
+    frame({
+      title: '거둬들이기', back: listScreen,
+      body: `<h1 class="big-title">${esc(eul(it.title))}<br />${where}에서 거둬들일까요?</h1>
+        <p class="lead">거둬들이면 공동체 화면에서 바로 사라져요.<br />언제든 다시 승인해서 배포할 수 있어요.</p>
+        <div class="summary-card"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.preacher)}</span></div>`,
+      primary: ['거둬들이기', () => busy(async () => {
+        for (const c of targets) await deleteDoc(doc(db, 'approvals', `${it.id}~${c}`));
+        approvals = await loadApprovals();
+        toast(`${where}에서 거둬들였어요`);
+        listScreen();
+      })],
+      secondary: ['취소', listScreen],
+    });
   }
 
   // ── 3. 검수 단계 (한 화면에 하나씩)
@@ -171,7 +198,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({
       title: `검수 6 / ${STEPS}`, step: [6, STEPS], back: () => review(it, 4),
       body: `<h1 class="big-title">${picked.map((c) => esc(names[c] ?? c)).join(', ')}에<br />배포할까요?</h1>
-        <p class="lead">배포하면 바로 공개돼요. 언제든 다시 배포를 멈출 수 있어요.</p>
+        <p class="lead">배포하면 바로 공개돼요. 언제든 거둬들일 수 있어요.</p>
         <div class="summary-card"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.preacher)}</span></div>`,
       primary: ['승인하고 배포하기', () => busy(async () => {
         for (const c of choices) {
@@ -182,10 +209,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         approvals = await loadApprovals();
         doneScreen(it, picked);
       })],
-      secondary: current.length ? ['배포 멈추기', () => busy(async () => {
-        for (const c of current.filter((c) => mine.includes(c))) await deleteDoc(doc(db, 'approvals', `${it.id}~${c}`));
-        approvals = await loadApprovals(); toast('배포를 멈췄어요'); listScreen();
-      })] : ['수정 요청하기', () => feedbackScreen(it)],
+      secondary: current.length ? ['거둬들이기', () => pullScreen(it)] : ['수정 요청하기', () => feedbackScreen(it)],
     });
   }
   function feedbackScreen(it: Item) {
@@ -265,7 +289,14 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .songs { display: flex; flex-wrap: wrap; gap: 8px; }
   .staff .songs span { padding: 8px 14px; border-radius: 999px; background: var(--card); border: 0.5px solid var(--line); font-weight: 600; }
   .staff .rows { display: grid; gap: 10px; }
-  .staff .rows button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+  .staff .row-wrap { display: flex; align-items: stretch; gap: 8px; }
+  .staff .row-main { flex: 1; min-width: 0; }
+  .staff .pull-btn {
+    flex: none; align-self: center; padding: 10px 14px; border-radius: 14px; cursor: pointer;
+    border: 0.5px solid var(--line); background: var(--card); color: #e5484d; font: inherit; font-size: .88rem; font-weight: 700;
+  }
+  .staff .pull-btn:active { transform: scale(.96); }
+  .staff .rows button.row-main { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
   .staff .rows .txt { display: flex; flex-direction: column; }
   .staff .rows strong { font-size: 1.1rem; }
   .staff .rows .txt span { font-size: .85rem; color: var(--muted); }
