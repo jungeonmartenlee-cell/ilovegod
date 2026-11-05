@@ -17,6 +17,42 @@ service cloud.firestore {
     function sameExpiry(roomId) { return request.resource.data.expireAt == roomAfter(roomId).expireAt; }
     function leaderPin() { return get(/databases/$(database)/documents/config/leader).data.pin; }
 
+    // ── 교역자
+    // staff/{구글 이메일} 문서에 맡은 공동체 목록(communities)을 적어 두면 교역자가 돼요 (콘솔에서 직접 등록)
+    function staffDoc() { return get(/databases/$(database)/documents/staff/$(request.auth.token.email)).data; }
+    function isStaff() {
+      return signedIn() && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/staff/$(request.auth.token.email));
+    }
+
+    match /staff/{email} {
+      allow get: if signedIn() && request.auth.token.email == email;
+      allow list, write: if false;
+    }
+
+    // 나눔지 승인(배포) 기록 — 누구나 읽을 수 있고, 맡은 공동체의 교역자만 쓰고 지울 수 있어요
+    match /approvals/{id} {
+      allow read: if true;
+      allow create, update: if isStaff()
+        && request.resource.data.keys().hasOnly(['gbs', 'community', 'title', 'by', 'at'])
+        && id == request.resource.data.gbs + '~' + request.resource.data.community
+        && request.resource.data.community in staffDoc().communities
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.at == request.time;
+      allow delete: if isStaff() && resource.data.community in staffDoc().communities;
+    }
+
+    // 수정 요청 메모 — 교역자만 쓰고 읽어요
+    match /feedback/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly(['gbs', 'title', 'text', 'by', 'at'])
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+        && request.resource.data.by == request.auth.token.email
+        && request.resource.data.at == request.time;
+    }
+
     match /config/{doc} {
       allow read, write: if false;
     }

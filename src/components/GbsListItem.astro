@@ -1,9 +1,9 @@
 ---
-import { shortDate, gbsUrl, type Gbs } from '../lib/gbs';
+import { shortDate, gbsUrl, gate, type Gbs } from '../lib/gbs';
 interface Props { gbs: Gbs; community: string }
 const { gbs, community } = Astro.props;
 ---
-<a class="row" href={gbsUrl(gbs, community)}>
+<a class="row" href={gbsUrl(gbs, community)} {...gate(gbs, community)}>
   <span class="date">{shortDate(gbs.data.date)}</span>
   <span class="body">
     <span class="title">{gbs.data.title}</span>

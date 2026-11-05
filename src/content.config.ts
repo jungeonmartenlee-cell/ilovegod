@@ -16,6 +16,8 @@ const gbs = defineCollection({
     key: z.string(),                              // 핵심 메시지 한 문장
     communities: z.array(z.string()).optional(),  // 보낼 공동체 (shared 폴더에 둘 때) 예: [gil, shalom]
     draft: z.boolean().optional(),                // true면 사이트에 안 보임
+    // review = 교역자 검수 중 (승인되면 공개), approved = 바로 공개
+    status: z.enum(['review', 'approved']).default('approved'),
 
     // ── 요약 탭
     summary: z.array(z.string()).min(1),          // 3줄 요약

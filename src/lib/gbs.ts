@@ -12,7 +12,15 @@ export const gbsSlug = (gbs: Gbs) => gbs.id.split('/').slice(1).join('/');
 /** 공동체 안에서의 GBS 주소 — 예: '/gil/gbs/2026-11-01' */
 export const gbsUrl = (gbs: Gbs, community: string) => `/${community}/gbs/${gbsSlug(gbs)}`;
 
-/** 한 공동체가 받은 공개 나눔지를 최신순으로 */
+/** 교역자 검수가 필요한 나눔지인지 */
+export const isReview = (gbs: Gbs) => gbs.data.status === 'review';
+/** 승인 기록 문서 ID (Firestore approvals 컬렉션) */
+export const approvalId = (gbs: Gbs) => gbs.id.replace(/\//g, '__');
+/** 검수 중이면, 승인된 공동체에만 보이도록 붙이는 표시 */
+export const gate = (gbs: Gbs, community: string) =>
+  isReview(gbs) ? { 'data-gate': approvalId(gbs), 'data-community': community } : {};
+
+/** 한 공동체가 받은 나눔지를 최신순으로 (검수 중인 것도 포함 — 화면에서 승인 여부로 가려요) */
 export async function getSortedGbs(community: string): Promise<Gbs[]> {
   const all = await getCollection('gbs', (gbs) => !gbs.data.draft && gbsSlug(gbs) !== '' && gbsTargets(gbs).includes(community));
   return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());

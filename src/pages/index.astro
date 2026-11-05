@@ -4,10 +4,10 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { BRAND, MAIN } from '../config';
 import { communities } from '../communities';
-import { getSortedGbs, formatDate } from '../lib/gbs';
+import { getSortedGbs, formatDate, gate } from '../lib/gbs';
 
 const cards = await Promise.all(
-  communities.map(async (c) => ({ c, latest: (await getSortedGbs(c.slug))[0] })),
+  communities.map(async (c) => ({ c, items: await getSortedGbs(c.slug) })),
 );
 ---
 <BaseLayout>
@@ -22,7 +22,7 @@ const cards = await Promise.all(
 
   <h2 class="section-title">공동체</h2>
   <ul class="list">
-    {cards.map(({ c, latest }) => (
+    {cards.map(({ c, items }) => (
       <li>
         <a class="card community" href={`/${c.slug}`}>
           <span class="top">
@@ -33,13 +33,13 @@ const cards = await Promise.all(
             <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="tag">{c.tagline}</span>
-          {latest && (
-            <span class="latest">
+          {items.map((latest) => (
+            <span class="latest" data-first-of={`main-${c.slug}`} {...gate(latest, c.slug)}>
               <span class="label">이번 주 GBS</span>
               <span class="gbs">{latest.data.title}</span>
               <span class="date">{latest.data.passage} · {formatDate(latest.data.date)}</span>
             </span>
-          )}
+          ))}
         </a>
       </li>
     ))}

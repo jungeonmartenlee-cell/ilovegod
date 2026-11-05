@@ -1,322 +1,342 @@
 ---
-// GBS 나눔지 — 요약 · 나눔 · 5일 묵상 · 기도
-// 탭 바로가기 주소: …/gbs/날짜#share, #devo, #pray  (주중에 5일 묵상만 보내고 싶을 때 #devo)
+// GBS 나눔지 — 토스처럼 한 화면에 한 가지 일만
+//   첫 화면(할 일 4개) → 요약 / 나눔(질문 하나씩) / 5일 묵상(하루씩) / 기도
+//   바로가기 주소: #summary, #share-1, #devo-1, #pray
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import FormButton from '../../../components/FormButton.astro';
-import { getSortedGbs, formatDate, gbsSlug, gbsUrl, type Gbs } from '../../../lib/gbs';
+import { getSortedGbs, formatDate, gbsSlug, gbsUrl, gate, isReview, type Gbs } from '../../../lib/gbs';
 import { communities, type CommunityEntry } from '../../../communities';
 
 export async function getStaticPaths() {
   const paths = [];
   for (const community of communities) {
-    const items = await getSortedGbs(community.slug);
-    paths.push(...items.map((gbs, i) => ({
-      params: { community: community.slug, slug: gbsSlug(gbs) },
-      props: { community, gbs, newer: items[i - 1], older: items[i + 1] },
-    })));
+    for (const gbs of await getSortedGbs(community.slug)) {
+      paths.push({ params: { community: community.slug, slug: gbsSlug(gbs) }, props: { community, gbs } });
+    }
   }
   return paths;
 }
 
-interface Props { community: CommunityEntry; gbs: Gbs; newer?: Gbs; older?: Gbs }
-const { community, gbs, newer, older } = Astro.props;
+interface Props { community: CommunityEntry; gbs: Gbs }
+const { community, gbs } = Astro.props;
 const d = gbs.data;
 const url = gbsUrl(gbs, community.slug);
-const hasDevo = d.devotions.length > 0;
-const hasPray = d.prayers.length > 0 || d.songs.length > 0;
-const tabs = [
-  { id: 'summary', label: '요약' },
-  { id: 'share', label: '나눔' },
-  ...(hasDevo ? [{ id: 'devo', label: `${d.devotions.length}일 묵상` }] : []),
-  ...(hasPray ? [{ id: 'pray', label: '기도' }] : []),
-];
-const devoKey = `devo:${gbs.id}`;
+const qs = d.share.questions;
+const devos = d.devotions;
 const prayerText = `[${d.title} · ${d.passage}] 기도제목\n` + d.prayers.map((p, i) => `${i + 1}. ${p}`).join('\n');
 const yt = (song: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(song + ' 찬양')}`;
 const chev = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const icons = {
+  summary: 'M5 4h14v16H5zM8.5 8.5h7M8.5 12h7M8.5 15.5h4.5',
+  share: 'M4 5.5h16v10H9l-5 4zM8.5 10.5h7',
+  devo: 'M4.5 5.5h15v14h-15zM7 3v3M17 3v3M4.5 9h15M9 14l2 2 4-4',
+  pray: 'M12 20s-7-4.3-9-8.6C1.6 8.2 3.6 5 6.8 5c2 0 3.5 1.1 5.2 2.9C13.7 6.1 15.2 5 17.2 5c3.2 0 5.2 3.2 3.8 6.4-2 4.3-9 8.6-9 8.6z',
+};
 ---
-<BaseLayout community={community} title={`${d.title} (${d.passage})`} description={d.key}>
-  <article>
-    <header class="gbs-head">
-      <span class="eyebrow">{formatDate(d.date)}{d.service && ` · ${d.service}`} · {d.preacher}</span>
-      <h1>{d.title}</h1>
-      <p class="passage">{d.passage}</p>
-      <p class="key">{d.key}</p>
-      <div class="head-actions">
-        <a class="btn open-room" href={`${url}/share`}>소그룹 나눔 열기</a>
-        <button class="btn ghost share" type="button" data-share>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
-          <span data-share-label>공유</span>
-        </button>
-      </div>
+<BaseLayout community={community} title={`${d.title} (${d.passage})`} description={d.key} bare hideHeader>
+  <div class="gbs-app" {...gate(gbs, community.slug)} data-devo-key={`devo:${gbs.id}`} data-home={`/${community.slug}`}>
+
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-back aria-label="뒤로">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
+      </button>
+      <span class="topbar-title" data-topbar-title></span>
+      <button type="button" class="icon-btn" data-share aria-label="공유">
+        <svg viewBox="0 0 24 24"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1" /></svg>
+      </button>
     </header>
 
-    <div data-tabs-anchor></div>
-    <nav class="tabs" role="tablist" aria-label="나눔지">
-      {tabs.map((t, i) => (
-        <button role="tab" type="button" data-tab={t.id} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
-      ))}
-    </nav>
+    <!-- 첫 화면: 할 일 고르기 -->
+    <section class="screen" data-screen="" data-title="">
+      <p class="eyebrow">{formatDate(d.date)}{d.service && ` · ${d.service}`}</p>
+      <h1 class="title">{d.title}</h1>
+      <p class="passage">{d.passage} · {d.preacher}</p>
+      <p class="key">{d.key}</p>
+
+      <ul class="tasks">
+        <li><a href="#summary">
+          <span class="ico"><svg viewBox="0 0 24 24"><path d={icons.summary} /></svg></span>
+          <span class="txt"><strong>설교 요약 읽기</strong><span>{d.summary.length}줄 요약 · 핵심 구절 · 설교 흐름</span></span>
+          <Fragment set:html={chev} />
+        </a></li>
+        <li><a href="#share-1">
+          <span class="ico"><svg viewBox="0 0 24 24"><path d={icons.share} /></svg></span>
+          <span class="txt"><strong>소그룹 나눔</strong><span>질문 {qs.length}개{d.share.minutes && ` · 약 ${d.share.minutes}분`}</span></span>
+          <Fragment set:html={chev} />
+        </a></li>
+        {devos.length > 0 && (
+          <li><a href="#devo-1" data-devo-link>
+            <span class="ico"><svg viewBox="0 0 24 24"><path d={icons.devo} /></svg></span>
+            <span class="txt"><strong>{devos.length}일 묵상</strong><span data-devo-progress>주중에 하루 하나씩</span></span>
+            <Fragment set:html={chev} />
+          </a></li>
+        )}
+        {(d.prayers.length > 0 || d.songs.length > 0) && (
+          <li><a href="#pray">
+            <span class="ico"><svg viewBox="0 0 24 24"><path d={icons.pray} /></svg></span>
+            <span class="txt"><strong>기도와 찬양</strong><span>기도 {d.prayers.length}개 · 적용 찬양 {d.songs.length}곡</span></span>
+            <Fragment set:html={chev} />
+          </a></li>
+        )}
+      </ul>
+      <p class="foot-note">설교 원고를 바탕으로 정리했으며, 담당 교역자가 검수합니다.<br />성경 본문: 개역개정</p>
+      <div class="cta"><a class="btn big" href="#share-1">나눔 시작하기</a></div>
+    </section>
 
     <!-- 요약 -->
-    <section class="panel" data-panel="summary">
-      <div class="card">
-        <h2 class="label">{d.summary.length}줄 요약</h2>
-        <ol class="sum">{d.summary.map((s) => <li>{s}</li>)}</ol>
-      </div>
-      {d.verses.length > 0 && (
-        <div class="card">
-          <h2 class="label">핵심 구절</h2>
-          {d.verses.map((v) => <blockquote class="verse"><cite>{v.ref}</cite>{v.text}</blockquote>)}
-        </div>
-      )}
+    <section class="screen" data-screen="summary" data-title="설교 요약" hidden>
+      <h2 class="screen-title">설교 요약</h2>
+      <ol class="sum">{d.summary.map((s) => <li>{s}</li>)}</ol>
+      {d.verses.map((v) => <blockquote class="verse"><cite>{v.ref}</cite>{v.text}</blockquote>)}
       {d.word && (
-        <div class="card word">
-          <h2 class="label">단어 하나</h2>
-          <div class="word-row">
-            {d.word.original && <span class="orig" lang="he">{d.word.original}</span>}
-            <div><strong>{d.word.word}</strong><p>{d.word.meaning}</p></div>
-          </div>
+        <div class="word">
+          {d.word.original && <span class="orig" lang="he">{d.word.original}</span>}
+          <div><strong>{d.word.word}</strong><p>{d.word.meaning}</p></div>
         </div>
       )}
       {d.flow.length > 0 && (
-        <div class="card">
-          <h2 class="label">설교 흐름</h2>
-          <ol class="flow">
-            {d.flow.map((f) => <li><strong>{f.title}</strong>{f.note && <span>{f.note}</span>}</li>)}
-          </ol>
-        </div>
+        <>
+          <h3 class="sub-title">설교 흐름</h3>
+          <ol class="flow">{d.flow.map((f) => <li><strong>{f.title}</strong>{f.note && <span>{f.note}</span>}</li>)}</ol>
+        </>
       )}
+      <div class="cta"><a class="btn big" href="#share-1">나눔 질문 보기</a></div>
     </section>
 
-    <!-- 나눔 -->
-    <section class="panel" data-panel="share" hidden>
-      <div class="card qs">
-        <h2 class="label">소그룹 나눔{d.share.minutes && ` · 약 ${d.share.minutes}분`}</h2>
-        <ol>
-          {d.share.questions.map((q) => <li><span class="tag">{q.tag}</span><p>{q.text}</p></li>)}
-        </ol>
-      </div>
+    <!-- 나눔: 질문 하나씩 -->
+    {qs.map((q, i) => (
+      <section class="screen" data-screen={`share-${i + 1}`} data-title="소그룹 나눔" hidden>
+        <div class="progress"><span style={`width:${((i + 1) / qs.length) * 100}%`}></span></div>
+        <p class="step">{i + 1} / {qs.length}</p>
+        <span class="tag">{q.tag}</span>
+        <p class="question">{q.text}</p>
+        <div class="cta">
+          {i < qs.length - 1
+            ? <a class="btn big" href={`#share-${i + 2}`}>다음 질문</a>
+            : <a class="btn big" href="#practice">{d.share.practice ? '이번 주 실천 보기' : '나눔 마치기'}</a>}
+        </div>
+      </section>
+    ))}
+
+    <!-- 이번 주 실천 → 나눔방 -->
+    <section class="screen" data-screen="practice" data-title="소그룹 나눔" hidden>
       {d.share.practice && (
-        <div class="card practice">
-          <h2 class="label">이번 주 실천</h2>
-          <p>{d.share.practice}</p>
-        </div>
+        <>
+          <span class="tag">이번 주 실천</span>
+          <p class="question">{d.share.practice}</p>
+        </>
       )}
-      <a class="btn full" href={`${url}/share`}>소그룹 나눔 열기</a>
+      <div class="room-hint">
+        <strong>함께 앉아 나누고 있나요?</strong>
+        <p>리더가 나눔방을 열면, 질문을 함께 넘기며 한 줄 나눔과 기도제목을 남길 수 있어요.</p>
+      </div>
+      <div class="cta">
+        <a class="btn big" href={`${url}/share`}>소그룹 나눔방 열기</a>
+        <a class="text-btn" href="#">처음으로</a>
+      </div>
     </section>
 
-    <!-- 5일 묵상 -->
-    {hasDevo && (
-      <section class="panel" data-panel="devo" hidden data-devo-key={devoKey}>
-        <p class="hint">주중에 날마다 하나씩 묵상하고, 소그룹 단톡방에서 한 줄씩 나눠 보세요.</p>
-        <div class="days" role="tablist">
-          {d.devotions.map((v, i) => (
-            <button type="button" data-day={i} aria-selected={i === 0 ? 'true' : 'false'}><b>{v.day}</b>Day {i + 1}</button>
-          ))}
+    <!-- 5일 묵상: 하루씩 -->
+    {devos.map((v, i) => (
+      <section class="screen" data-screen={`devo-${i + 1}`} data-title={`${devos.length}일 묵상`} hidden>
+        <div class="days">
+          {devos.map((x, j) => <a href={`#devo-${j + 1}`} class:list={['day', { on: i === j }]} data-day={j}>{x.day}</a>)}
         </div>
-        {d.devotions.map((v, i) => (
-          <div class="card devo" data-devo={i} hidden={i !== 0}>
-            <span class="label">DAY {i + 1} · {v.ref}</span>
-            <h3>{v.title}</h3>
-            <p>{v.body}</p>
-            <div class="today"><span>오늘의 질문</span>{v.question}</div>
-            <button type="button" class="btn ghost full check" data-check={i}>오늘 묵상 완료하기</button>
-          </div>
-        ))}
-        <button type="button" class="link-btn" data-share-devo>5일 묵상 링크 보내기 <Fragment set:html={chev} /></button>
+        <p class="eyebrow">DAY {i + 1} · {v.ref}</p>
+        <h2 class="screen-title">{v.title}</h2>
+        <p class="body">{v.body}</p>
+        <div class="today"><span>오늘의 질문</span>{v.question}</div>
+        <button type="button" class="text-btn center" data-share-devo>5일 묵상 링크 보내기</button>
+        <div class="cta">
+          <button type="button" class="btn big" data-check={i} data-next={i < devos.length - 1 ? `#devo-${i + 2}` : ''}>오늘 묵상 완료</button>
+        </div>
       </section>
-    )}
+    ))}
 
-    <!-- 기도 -->
-    {hasPray && (
-      <section class="panel" data-panel="pray" hidden>
-        {d.prayers.length > 0 && (
-          <div class="card">
-            <h2 class="label">함께 드리는 기도</h2>
-            <ol class="prayers">{d.prayers.map((p) => <li>{p}</li>)}</ol>
-            <button type="button" class="btn ghost full" data-copy={prayerText}>기도제목 복사</button>
-          </div>
-        )}
-        {d.songs.length > 0 && (
-          <div class="card">
-            <h2 class="label">적용 찬양</h2>
-            <p class="hint left">예배나 소그룹 마무리에 함께 불러요. 누르면 찬양을 찾아볼 수 있어요.</p>
-            <ul class="songs">
-              {d.songs.map((s) => <li><a href={yt(s)} target="_blank" rel="noopener">{s}</a></li>)}
-            </ul>
-          </div>
-        )}
-      </section>
-    )}
+    <!-- 기도와 찬양 -->
+    <section class="screen" data-screen="pray" data-title="기도와 찬양" hidden>
+      <h2 class="screen-title">함께 드리는 기도</h2>
+      <ol class="prayers">{d.prayers.map((p) => <li>{p}</li>)}</ol>
+      {d.songs.length > 0 && (
+        <>
+          <h3 class="sub-title">적용 찬양</h3>
+          <p class="hint">예배나 소그룹 마무리에 함께 불러요. 누르면 찬양을 찾아볼 수 있어요.</p>
+          <ul class="songs">{d.songs.map((s) => <li><a href={yt(s)} target="_blank" rel="noopener">{s}</a></li>)}</ul>
+        </>
+      )}
+      <div class="cta"><button type="button" class="btn big" data-copy={prayerText}>기도제목 복사</button></div>
+    </section>
+  </div>
 
-    <FormButton community={community} />
-    <p class="foot-note">설교 원고를 바탕으로 정리했으며, 담당 교역자가 검수합니다. · 성경 본문: 개역개정</p>
-  </article>
-
-  <nav class="pager group" aria-label="다른 주 GBS">
-    {newer && <a href={gbsUrl(newer, community.slug)}><span class="dir">다음</span><span class="t">{newer.data.title}</span><Fragment set:html={chev} /></a>}
-    {older && <a href={gbsUrl(older, community.slug)}><span class="dir">이전</span><span class="t">{older.data.title}</span><Fragment set:html={chev} /></a>}
-    <a href={`/${community.slug}/gbs`}><span class="dir">목록</span><span class="t">GBS 전체 보기</span><Fragment set:html={chev} /></a>
-  </nav>
+  {isReview(gbs) && (
+    <section class="pending show" data-gate-pending>
+      <h1>아직 검수 중인 나눔지예요</h1>
+      <p>담당 교역자가 승인하면 이곳에서 볼 수 있어요.</p>
+      <a class="btn big" href={`/${community.slug}`}>처음으로</a>
+    </section>
+  )}
 </BaseLayout>
 
 <script>
-  const $$ = <T extends HTMLElement>(s: string) => Array.from(document.querySelectorAll<T>(s));
+  const app = document.querySelector<HTMLElement>('.gbs-app')!;
+  const screens = Array.from(app.querySelectorAll<HTMLElement>('[data-screen]'));
+  const titleEl = app.querySelector<HTMLElement>('[data-topbar-title]')!;
+  const devoKey = app.dataset.devoKey!;
+  let done: Record<string, boolean> = {};
+  try { done = JSON.parse(localStorage.getItem(devoKey) || '{}') || {}; } catch { done = {}; }
 
-  // ── 탭 (주소 #share, #devo, #pray 로 바로 열기)
-  const tabs = $$<HTMLButtonElement>('[data-tab]');
-  const panels = $$('[data-panel]');
-  function openTab(id: string, scroll = false) {
-    if (!panels.some((p) => p.dataset.panel === id)) id = 'summary';
-    tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === id)));
-    panels.forEach((p) => (p.hidden = p.dataset.panel !== id));
-    history.replaceState(null, '', id === 'summary' ? location.pathname : `#${id}`);
-    // 이미 아래로 내려와 있으면, 새 탭의 맨 위가 보이도록 올려 줘요
-    const top = document.querySelector<HTMLElement>('[data-tabs-anchor]')!.getBoundingClientRect().top + scrollY - 58;
-    if (scroll && scrollY > top) scrollTo({ top, behavior: 'smooth' });
+  function show() {
+    const id = location.hash.slice(1);
+    const target = screens.find((s) => s.dataset.screen === id) ?? screens[0];
+    screens.forEach((s) => (s.hidden = s !== target));
+    titleEl.textContent = target.dataset.title ?? '';
+    app.classList.toggle('at-home', target === screens[0]);
+    scrollTo(0, 0);
+    paintDevo();
   }
-  tabs.forEach((t) => t.addEventListener('click', () => openTab(t.dataset.tab!, true)));
-  if (location.hash) openTab(location.hash.slice(1));
-
-  // ── 5일 묵상 (완료 표시는 이 휴대폰에만 저장)
-  const devo = document.querySelector<HTMLElement>('[data-devo-key]');
-  if (devo) {
-    const key = devo.dataset.devoKey!;
-    let done: Record<string, boolean> = {};
-    try { done = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { done = {}; }
-    const days = $$<HTMLButtonElement>('[data-day]');
-    const cards = $$('[data-devo]');
-    const paint = () => {
-      days.forEach((b) => b.classList.toggle('done', !!done[b.dataset.day!]));
-      $$<HTMLButtonElement>('[data-check]').forEach((b) => {
-        const on = !!done[b.dataset.check!];
-        b.classList.toggle('done', on);
-        b.textContent = on ? '오늘 묵상 완료 ✓' : '오늘 묵상 완료하기';
-      });
-    };
-    days.forEach((b) => b.addEventListener('click', () => {
-      days.forEach((x) => x.setAttribute('aria-selected', String(x === b)));
-      cards.forEach((c) => (c.hidden = c.dataset.devo !== b.dataset.day));
-    }));
-    $$<HTMLButtonElement>('[data-check]').forEach((b) => b.addEventListener('click', () => {
-      done[b.dataset.check!] = !done[b.dataset.check!];
-      try { localStorage.setItem(key, JSON.stringify(done)); } catch { /* 저장 불가 환경 */ }
-      paint();
-    }));
-    paint();
+  function paintDevo() {
+    const total = app.querySelectorAll('[data-check]').length;
+    const n = Object.values(done).filter(Boolean).length;
+    const prog = app.querySelector('[data-devo-progress]');
+    if (prog && total) prog.textContent = n ? `${total}일 중 ${n}일 완료` : '주중에 하루 하나씩';
+    const firstLeft = Array.from({ length: total }, (_, i) => i).find((i) => !done[i]);
+    app.querySelector('[data-devo-link]')?.setAttribute('href', `#devo-${(firstLeft ?? 0) + 1}`);
+    app.querySelectorAll<HTMLElement>('[data-day]').forEach((a) => a.classList.toggle('done', !!done[a.dataset.day!]));
+    app.querySelectorAll<HTMLButtonElement>('[data-check]').forEach((b) => {
+      const on = !!done[b.dataset.check!];
+      b.classList.toggle('done', on);
+      b.textContent = on ? (b.dataset.next ? '완료 ✓ · 다음 날 보기' : '묵상을 모두 마쳤어요 ✓') : '오늘 묵상 완료';
+    });
   }
+  window.addEventListener('hashchange', show);
+  show();
 
-  // ── 공유 / 복사
-  async function share(url: string, title: string, label?: Element | null) {
+  app.querySelector('[data-back]')!.addEventListener('click', () => {
+    if (location.hash) location.hash = '';
+    else location.href = app.dataset.home!;
+  });
+  app.querySelectorAll<HTMLButtonElement>('[data-check]').forEach((b) => b.addEventListener('click', () => {
+    const i = b.dataset.check!;
+    if (done[i] && b.dataset.next) { location.hash = b.dataset.next; return; }
+    done[i] = true;
+    try { localStorage.setItem(devoKey, JSON.stringify(done)); } catch { /* 저장 불가 */ }
+    paintDevo();
+  }));
+
+  async function share(url: string, title: string) {
     try {
       if (navigator.share) return await navigator.share({ title, url });
       await navigator.clipboard.writeText(url);
-      if (label) label.textContent = '주소 복사됨';
-    } catch { /* 사용자가 취소함 */ }
+      toast('주소를 복사했어요');
+    } catch { /* 취소 */ }
   }
-  $$<HTMLButtonElement>('[data-share]').forEach((btn) =>
-    btn.addEventListener('click', () => share(location.href, document.title, btn.querySelector('[data-share-label]'))));
-  document.querySelector('[data-share-devo]')?.addEventListener('click', (e) =>
-    share(`${location.origin}${location.pathname}#devo`, `5일 묵상 · ${document.title}`, e.currentTarget as Element));
-  $$<HTMLButtonElement>('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(btn.dataset.copy!); btn.textContent = '복사했어요 ✓'; }
-    catch { btn.textContent = '복사가 안 되는 환경이에요'; }
-    setTimeout(() => (btn.textContent = '기도제목 복사'), 1800);
+  app.querySelector('[data-share]')!.addEventListener('click', () => share(location.href, document.title));
+  app.querySelectorAll('[data-share-devo]').forEach((b) => b.addEventListener('click', () =>
+    share(`${location.origin}${location.pathname}#devo-1`, `5일 묵상 · ${document.title}`)));
+  app.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.dataset.copy!); toast('기도제목을 복사했어요'); }
+    catch { toast('복사가 안 되는 환경이에요'); }
   }));
+  function toast(msg: string) {
+    let t = document.querySelector<HTMLElement>('.toast');
+    if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.append(t); }
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout((t as any)._h); (t as any)._h = setTimeout(() => t!.classList.remove('on'), 1800);
+  }
 </script>
 
-<style>
-  .gbs-head { padding: 12px 0 20px; }
-  .gbs-head h1 { margin: 6px 0 4px; font-size: 2.3rem; }
-  .passage { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--accent); }
-  .key { margin: 14px 0 18px; padding-left: 14px; border-left: 3px solid var(--accent); font-size: 1.12rem; font-weight: 600; line-height: 1.6; letter-spacing: -0.02em; }
-  .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .open-room { min-height: 40px; padding: 0 18px; font-size: .9rem; }
-  .share { min-height: 40px; padding: 0 16px; font-size: .88rem; }
-  .share svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+<style is:global>
+  body.bare main { padding: 0 0 140px; }
+  .gbs-app [data-screen][hidden] { display: none !important; }
 
-  .tabs {
-    position: sticky; top: 54px; z-index: 8;
-    display: flex; gap: 4px; padding: 4px; margin: 0 0 16px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--card) 82%, transparent);
-    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
-    border: 0.5px solid var(--line);
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+    height: 54px; margin: 0 -12px;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
   }
-  .tabs button {
-    flex: 1; min-height: 38px; border: 0; border-radius: 999px; background: none; cursor: pointer;
-    font: inherit; font-size: .92rem; font-weight: 600; color: var(--muted);
+  .topbar-title { text-align: center; font-weight: 700; font-size: 1rem; }
+  .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); cursor: pointer; }
+  .icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .at-home .topbar-title { opacity: 0; }
+
+  .gbs-app .screen { padding-top: 12px; animation: screen-in .22s ease; }
+  @keyframes screen-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+
+  .gbs-app .eyebrow { display: block; margin: 0 0 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+  .gbs-app .title { margin: 0; font-size: 2.6rem; letter-spacing: -0.05em; }
+  .gbs-app .passage { margin: 4px 0 0; font-weight: 600; color: var(--accent); }
+  .gbs-app .key { margin: 22px 0 28px; font-size: 1.3rem; font-weight: 700; line-height: 1.55; letter-spacing: -0.035em; }
+
+  .tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .tasks a {
+    display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 22px;
+    background: var(--card); border: 0.5px solid var(--line); text-decoration: none;
+    transition: transform .12s ease;
   }
-  .tabs button[aria-selected='true'] { background: var(--ink); color: var(--ink-text); }
+  .tasks a:active { transform: scale(.98); }
+  .tasks .ico { flex: none; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+  .tasks .ico svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tasks .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .tasks strong { font-size: 1.05rem; }
+  .tasks .txt span { font-size: .85rem; color: var(--muted); }
+  .foot-note { margin: 22px 0 0; font-size: .75rem; line-height: 1.6; color: var(--faint); text-align: center; }
 
-  .panel .card { margin-bottom: 12px; }
-  .label { display: block; margin: 0 0 10px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); }
-  ol, ul { margin: 0; padding: 0; list-style: none; }
-
-  .sum { counter-reset: s; display: grid; gap: 12px; }
-  .sum li { counter-increment: s; position: relative; padding-left: 26px; line-height: 1.7; }
-  .sum li::before { content: counter(s); position: absolute; left: 0; top: 0; font-weight: 800; color: var(--accent); }
-
-  .verse { margin: 0 0 10px; padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); line-height: 1.75; }
-  .verse:last-child { margin-bottom: 0; }
-  .verse cite { display: block; margin-bottom: 2px; font-style: normal; font-size: .78rem; font-weight: 700; color: var(--accent); }
-
-  .word-row { display: flex; gap: 16px; align-items: center; }
-  .orig { flex: none; font-size: 2rem; font-family: 'Times New Roman', serif; color: var(--text); }
-  .word strong { font-size: 1.1rem; }
-  .word p { margin: 2px 0 0; font-size: .95rem; line-height: 1.65; color: var(--muted); }
-
-  .flow { counter-reset: f; display: grid; gap: 12px; }
-  .flow li { counter-increment: f; position: relative; padding-left: 38px; min-height: 26px; }
-  .flow li::before {
-    content: counter(f); position: absolute; left: 0; top: 0;
-    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--ink); color: var(--ink-text); font-size: .78rem; font-weight: 700;
+  .cta {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 25;
+    width: min(100%, 640px); padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+    display: grid; gap: 4px;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
   }
+  .btn.big { width: 100%; min-height: 56px; border-radius: 18px; font-size: 1.05rem; }
+  .btn.big.done { background: var(--accent); color: #fff; }
+  .text-btn { display: block; padding: 12px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); text-align: center; text-decoration: none; cursor: pointer; }
+  .text-btn.center { margin: 8px auto 0; color: var(--accent); }
+
+  .screen-title { margin: 4px 0 18px; font-size: 1.75rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.35; }
+  .sub-title { margin: 32px 0 12px; font-size: 1.15rem; font-weight: 800; }
+  .gbs-app ol, .gbs-app ul { list-style: none; margin: 0; padding: 0; }
+  .sum, .prayers { counter-reset: s; display: grid; gap: 14px; }
+  .sum { margin-bottom: 22px !important; }
+  .sum li, .prayers li { counter-increment: s; position: relative; padding-left: 28px; font-size: 1.05rem; line-height: 1.75; }
+  .sum li::before, .prayers li::before { content: counter(s); position: absolute; left: 0; font-weight: 800; color: var(--accent); }
+  .verse { margin: 0 0 10px; padding: 16px 18px; border-radius: 18px; background: var(--card); border: 0.5px solid var(--line); line-height: 1.8; }
+  .verse cite { display: block; font-style: normal; font-size: .8rem; font-weight: 700; color: var(--accent); }
+  .word { display: flex; gap: 16px; align-items: center; margin-top: 12px; padding: 16px 18px; border-radius: 18px; background: var(--accent-soft); }
+  .word .orig { flex: none; font-size: 2rem; font-family: 'Times New Roman', serif; }
+  .word p { margin: 2px 0 0; font-size: .93rem; line-height: 1.65; color: var(--muted); }
+  .flow { counter-reset: f; display: grid; gap: 14px; }
+  .flow li { counter-increment: f; position: relative; padding-left: 38px; }
   .flow li:first-child { counter-increment: none; }
+  .flow li::before { content: counter(f); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--ink-text); font-size: .78rem; font-weight: 700; }
   .flow li:first-child::before { content: '✦'; }
-  .flow strong { display: block; font-weight: 600; line-height: 1.5; }
+  .flow strong { display: block; font-weight: 600; }
   .flow span { display: block; font-size: .85rem; color: var(--muted); }
 
-  .qs ol { display: grid; }
-  .qs li { padding: 14px 0; border-top: 0.5px solid var(--line); }
-  .qs li:first-child { border-top: 0; padding-top: 2px; }
-  .tag { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
-  .qs p { margin: 0; line-height: 1.75; }
-  .practice p { margin: 0; line-height: 1.75; }
-  .btn.full { width: 100%; }
+  .progress { height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 4px 0 18px; }
+  .progress span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  .step { margin: 0 0 14px; font-size: .9rem; font-weight: 700; color: var(--muted); }
+  .gbs-app .tag { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: .82rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+  .question { margin: 16px 0 0; font-size: 1.45rem; font-weight: 700; line-height: 1.6; letter-spacing: -0.035em; }
+  .room-hint { margin-top: 36px; padding: 18px 20px; border-radius: 20px; background: var(--card); border: 0.5px solid var(--line); }
+  .room-hint p { margin: 4px 0 0; font-size: .93rem; line-height: 1.65; color: var(--muted); }
 
-  .hint { margin: 0 4px 12px; font-size: .85rem; color: var(--muted); text-align: center; }
-  .hint.left { text-align: left; margin: -4px 0 12px; }
-  .days { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
-  .days button {
-    position: relative; flex: 1; min-width: 58px; padding: 8px 0; border-radius: 16px; cursor: pointer;
-    border: 0.5px solid var(--line); background: var(--card); font: inherit; font-size: .75rem; color: var(--muted);
-  }
-  .days b { display: block; font-size: 1.05rem; color: var(--text); }
-  .days button[aria-selected='true'] { background: var(--ink); border-color: var(--ink); color: color-mix(in srgb, var(--ink-text) 70%, transparent); }
-  .days button[aria-selected='true'] b { color: var(--ink-text); }
-  .days button.done::after { content: '✓'; position: absolute; top: 4px; right: 8px; font-size: .7rem; font-weight: 800; color: var(--accent); }
-  .devo h3 { margin: 4px 0 8px; font-size: 1.3rem; }
-  .devo p { margin: 0 0 14px; line-height: 1.8; }
-  .today { padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); line-height: 1.7; margin-bottom: 14px; }
-  .today span { display: block; font-size: .78rem; font-weight: 700; color: var(--accent); }
-  .check.done { background: var(--accent); color: #fff; border-color: transparent; }
-  .link-btn { display: flex; align-items: center; gap: 6px; margin: 4px auto 0; padding: 8px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }
-  .link-btn :global(.chev) { color: var(--accent); }
+  .days { display: flex; gap: 6px; margin: 4px 0 22px; }
+  .day { position: relative; flex: 1; padding: 10px 0; border-radius: 14px; text-align: center; font-weight: 700; text-decoration: none; background: var(--card); border: 0.5px solid var(--line); color: var(--muted); }
+  .day.on { background: var(--ink); color: var(--ink-text); border-color: var(--ink); }
+  .day.done::after { content: ''; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .gbs-app .body { margin: 0 0 18px; font-size: 1.05rem; line-height: 1.85; }
+  .today { padding: 18px 20px; border-radius: 20px; background: var(--accent-soft); font-size: 1.05rem; font-weight: 600; line-height: 1.7; }
+  .today span { display: block; margin-bottom: 4px; font-size: .8rem; font-weight: 700; color: var(--accent); }
 
-  .prayers { counter-reset: p; display: grid; gap: 12px; margin-bottom: 16px; }
-  .prayers li { counter-increment: p; position: relative; padding-left: 26px; line-height: 1.7; }
-  .prayers li::before { content: counter(p); position: absolute; left: 0; font-weight: 800; color: var(--accent); }
+  .hint { margin: -4px 0 12px; font-size: .88rem; color: var(--muted); }
   .songs { display: flex; flex-wrap: wrap; gap: 8px; }
-  .songs a { display: inline-block; padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: .92rem; text-decoration: none; }
+  .songs a { display: inline-block; padding: 10px 16px; border-radius: 999px; background: var(--card); border: 0.5px solid var(--line); font-weight: 600; text-decoration: none; }
 
-  .foot-note { margin: 24px 4px 0; font-size: .75rem; color: var(--faint); text-align: center; line-height: 1.6; }
+  .pending { padding: 120px 8px 0; text-align: center; }
+  .pending h1 { font-size: 1.6rem; }
+  .pending p { color: var(--muted); margin-bottom: 28px; }
 
-  .pager { margin-top: 32px; }
-  .pager a { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; }
-  .pager a + a { border-top: 0.5px solid var(--line); }
-  .dir { flex: none; width: 40px; font-size: .82rem; font-weight: 600; color: var(--muted); }
-  .t { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast { position: fixed; left: 50%; bottom: 110px; transform: translate(-50%, 10px); z-index: 60; padding: 12px 18px; border-radius: 16px; background: var(--ink); color: var(--ink-text); font-weight: 600; font-size: .9rem; opacity: 0; pointer-events: none; transition: all .2s ease; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
 </style>

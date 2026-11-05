@@ -4,6 +4,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import TabBar from '../components/TabBar.astro';
+import Gates from '../components/Gates.astro';
 import { BRAND, MAIN } from '../config';
 import type { CommunityEntry } from '../communities';
 
@@ -13,8 +14,10 @@ interface Props {
   community?: CommunityEntry;
   /** 탭 바·바닥글 없이 화면 전체를 쓰는 페이지 (나눔방) */
   bare?: boolean;
+  /** 위쪽 로고 머리글 숨기기 (자체 상단 바를 쓰는 화면) */
+  hideHeader?: boolean;
 }
-const { title, community, bare = false } = Astro.props;
+const { title, community, bare = false, hideHeader = false } = Astro.props;
 const description = Astro.props.description
   ?? community?.description
   ?? (community ? `${community.mainName} 소개와 주일 설교 후 소그룹 GBS 나눔 자료` : MAIN.description);
@@ -44,7 +47,7 @@ const fullTitle = title
     <style is:global>body.has-tabbar { --tabbar: 84px; }</style>
   </head>
   <body class:list={[{ 'has-tabbar': community && !bare, bare }]}>
-    <Header community={community} />
+    {!hideHeader && <Header community={community} />}
     <main>
       <div class="container">
         <slot />
@@ -52,5 +55,6 @@ const fullTitle = title
     </main>
     {!bare && <Footer community={community} />}
     {community && !bare && <TabBar community={community} />}
+    <Gates />
   </body>
 </html>

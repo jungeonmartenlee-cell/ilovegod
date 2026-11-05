@@ -134,3 +134,10 @@ h2 { font-size: 1.3rem; font-weight: 700; }
 }
 
 .chev { width: 8px; height: 13px; flex: none; color: var(--faint); }
+
+/* 교역자 승인 전인 나눔지는 숨겨요 */
+[data-gate]:not(.gate-open) { display: none !important; }
+.first-hidden { display: none !important; }
+[data-gate-pending] { display: none; }
+.gates-ready [data-gate-pending].show { display: block; }
+[data-gate].gate-open ~ [data-gate-pending] { display: none !important; }

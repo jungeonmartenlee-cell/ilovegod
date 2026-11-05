@@ -1,0 +1,288 @@
+---
+// 교역자 검수 — 주소: /staff
+// 로그인 → 검수할 나눔지 고르기 → 요약 · 나눔 · 묵상 · 기도 확인 → 보낼 공동체 → 승인하고 배포
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+import { approvalId, gbsSlug, formatDate } from '../../lib/gbs';
+import { communities } from '../../communities';
+
+const all = (await getCollection('gbs', (g) => !g.data.draft && gbsSlug(g) !== ''))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const folderOf = (id: string) => id.split('/')[0];
+const items = all.map((g) => {
+  const targets = folderOf(g.id) === 'shared' ? (g.data.communities ?? []) : [folderOf(g.id), ...(g.data.communities ?? [])];
+  return {
+    id: approvalId(g), slug: gbsSlug(g), review: g.data.status === 'review', targets,
+    title: g.data.title, passage: g.data.passage, preacher: g.data.preacher, date: formatDate(g.data.date),
+    service: g.data.service ?? '', key: g.data.key, summary: g.data.summary,
+    questions: g.data.share.questions, practice: g.data.share.practice ?? '',
+    devotions: g.data.devotions.map((v) => ({ day: v.day, ref: v.ref, title: v.title, question: v.question })),
+    prayers: g.data.prayers, songs: g.data.songs,
+  };
+});
+const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
+---
+<BaseLayout title="교역자 검수" bare hideHeader>
+  <script type="application/json" id="staff-data" set:html={JSON.stringify({ items, names })} />
+  <div class="staff">
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-back aria-label="뒤로" hidden><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg></button>
+      <span class="topbar-title" data-title></span>
+      <span></span>
+    </header>
+    <div class="progress" data-progress hidden><span></span></div>
+    <main data-view></main>
+    <div class="cta" data-cta></div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut, onAuthStateChanged, type User } from 'firebase/auth';
+  import { doc, getDoc, setDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+  import { auth, db } from '../../lib/firebase';
+  import { loadApprovals } from '../../lib/approval';
+
+  type Item = {
+    id: string; slug: string; review: boolean; targets: string[]; title: string; passage: string; preacher: string;
+    date: string; service: string; key: string; summary: string[]; questions: { tag: string; text: string }[];
+    practice: string; devotions: { day: string; ref: string; title: string; question: string }[];
+    prayers: string[]; songs: string[];
+  };
+  const { items, names } = JSON.parse(document.getElementById('staff-data')!.textContent!) as { items: Item[]; names: Record<string, string> };
+  const view = document.querySelector<HTMLElement>('[data-view]')!;
+  const cta = document.querySelector<HTMLElement>('[data-cta]')!;
+  const titleEl = document.querySelector<HTMLElement>('[data-title]')!;
+  const backBtn = document.querySelector<HTMLButtonElement>('[data-back]')!;
+  const progress = document.querySelector<HTMLElement>('[data-progress]')!;
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const params = new URLSearchParams(location.search);
+  const emu = params.has('emulator') ? '?emulator=1' : '';
+
+  let user: User | null = null;
+  let mine: string[] = [];            // 내가 맡은 공동체
+  let approvals: Record<string, string[]> = {};
+  let back: (() => void) | null = null;
+
+  function frame(opts: { title?: string; step?: [number, number]; body: string; primary?: [string, () => void]; secondary?: [string, () => void]; back?: () => void }) {
+    titleEl.textContent = opts.title ?? '';
+    back = opts.back ?? null; backBtn.hidden = !back;
+    progress.hidden = !opts.step;
+    if (opts.step) progress.querySelector('span')!.style.width = `${(opts.step[0] / opts.step[1]) * 100}%`;
+    view.innerHTML = `<section class="screen">${opts.body}</section>`;
+    cta.innerHTML = '';
+    if (opts.primary) {
+      const b = document.createElement('button'); b.className = 'btn big'; b.textContent = opts.primary[0]; b.onclick = opts.primary[1]; cta.append(b);
+    }
+    if (opts.secondary) {
+      const b = document.createElement('button'); b.className = 'text-btn'; b.textContent = opts.secondary[0]; b.onclick = opts.secondary[1]; cta.append(b);
+    }
+    scrollTo(0, 0);
+  }
+  backBtn.onclick = () => back?.();
+  const toast = (msg: string) => {
+    let t = document.querySelector<HTMLElement>('.toast');
+    if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.append(t); }
+    t.textContent = msg; t.classList.add('on');
+    clearTimeout((t as any)._h); (t as any)._h = setTimeout(() => t!.classList.remove('on'), 2200);
+  };
+  const busy = async (fn: () => Promise<void>) => {
+    const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = true; b.textContent = '처리 중…'; }
+    try { await fn(); } catch (e) { console.error(e); toast('처리하지 못했어요. 권한이나 인터넷 연결을 확인해 주세요.'); if (b) b.disabled = false; }
+  };
+
+  // ── 1. 로그인
+  function loginScreen() {
+    frame({
+      body: `<h1 class="big-title">교역자 검수</h1>
+        <p class="lead">설교 원고로 만든 나눔지를 확인하고,<br />맡은 공동체에 배포해요.</p>
+        <div class="note">교역자로 등록된 구글 계정만 들어올 수 있어요.</div>`,
+      primary: ['구글 계정으로 시작하기', () => busy(login)],
+    });
+  }
+  async function login() {
+    const testEmail = params.get('as');
+    if (emu && testEmail) {
+      await signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub: testEmail, email: testEmail, email_verified: true })));
+    } else {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    }
+  }
+
+  // ── 2. 목록
+  const status = (it: Item) => {
+    const out = approvals[it.id] ?? [];
+    if (!it.review) return { label: '바로 공개 자료', on: true };
+    return out.length ? { label: `배포됨 · ${out.map((c) => names[c] ?? c).join(', ')}`, on: true } : { label: '검수 대기', on: false };
+  };
+  function listScreen() {
+    const mineItems = items.filter((it) => it.review && it.targets.some((t) => mine.includes(t)));
+    const waiting = mineItems.filter((it) => !(approvals[it.id] ?? []).length).length;
+    frame({
+      title: '',
+      body: `<p class="eyebrow">${esc(user!.email!)}</p>
+        <h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
+        <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')}</p>
+        <ul class="rows">${mineItems.map((it) => {
+          const s = status(it);
+          return `<li><button type="button" data-open="${it.id}">
+            <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span></span>
+            <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span></button></li>`;
+        }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>`,
+      secondary: ['로그아웃', () => signOut(auth)],
+    });
+    view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
+  }
+
+  // ── 3. 검수 단계 (한 화면에 하나씩)
+  const STEPS = 6;
+  function review(it: Item, step: number) {
+    const go = (n: number) => () => review(it, n);
+    const head = (t: string) => `<p class="eyebrow">${esc(it.title)} · ${esc(it.passage)}</p><h2 class="screen-title">${t}</h2>`;
+    const common = { title: `검수 ${Math.min(step + 1, STEPS)} / ${STEPS}`, step: [step + 1, STEPS] as [number, number], back: step ? go(step - 1) : listScreen };
+    if (step === 0) frame({ ...common, body: head('설교 요약이 맞나요?') +
+      `<p class="key">${esc(it.key)}</p><ol class="sum">${it.summary.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>`,
+      primary: ['확인했어요', go(1)] });
+    if (step === 1) frame({ ...common, body: head(`나눔 질문 ${it.questions.length}개`) +
+      `<ol class="qlist">${it.questions.map((q) => `<li><span class="tag">${esc(q.tag)}</span><p>${esc(q.text)}</p></li>`).join('')}</ol>` +
+      (it.practice ? `<div class="note"><strong>이번 주 실천</strong><br />${esc(it.practice)}</div>` : ''),
+      primary: ['확인했어요', go(2)] });
+    if (step === 2) frame({ ...common, body: head(`${it.devotions.length}일 묵상`) +
+      `<ol class="qlist">${it.devotions.map((v) => `<li><span class="tag">${esc(v.day)} · ${esc(v.ref)}</span><p><strong>${esc(v.title)}</strong><br />${esc(v.question)}</p></li>`).join('')}</ol>`,
+      primary: ['확인했어요', go(3)] });
+    if (step === 3) frame({ ...common, body: head('기도와 적용 찬양') +
+      `<ol class="sum">${it.prayers.map((p) => `<li>${esc(p)}</li>`).join('')}</ol>
+       <div class="songs">${it.songs.map((s) => `<span>${esc(s)}</span>`).join('')}</div>`,
+      primary: ['확인했어요', go(4)] });
+    if (step === 4) {
+      const choices = it.targets.filter((t) => mine.includes(t));
+      const current = approvals[it.id] ?? [];
+      frame({ ...common, body: head('어느 공동체에 보낼까요?') +
+        `<p class="lead">맡은 공동체에만 보낼 수 있어요.</p>
+         <ul class="checks">${choices.map((c) => `<li><label><input type="checkbox" value="${c}" ${current.length === 0 || current.includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>`,
+        primary: ['다음', () => {
+          const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
+          if (!picked.length) return toast('공동체를 하나 이상 골라 주세요');
+          confirmScreen(it, picked, choices);
+        }] });
+    }
+  }
+  function confirmScreen(it: Item, picked: string[], choices: string[]) {
+    const current = approvals[it.id] ?? [];
+    frame({
+      title: `검수 6 / ${STEPS}`, step: [6, STEPS], back: () => review(it, 4),
+      body: `<h1 class="big-title">${picked.map((c) => esc(names[c] ?? c)).join(', ')}에<br />배포할까요?</h1>
+        <p class="lead">배포하면 바로 공개돼요. 언제든 다시 배포를 멈출 수 있어요.</p>
+        <div class="summary-card"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.preacher)}</span></div>`,
+      primary: ['승인하고 배포하기', () => busy(async () => {
+        for (const c of choices) {
+          const ref = doc(db, 'approvals', `${it.id}~${c}`);
+          if (picked.includes(c)) await setDoc(ref, { gbs: it.id, community: c, title: it.title, by: user!.email, at: serverTimestamp() });
+          else if (current.includes(c)) await deleteDoc(ref);
+        }
+        approvals = await loadApprovals();
+        doneScreen(it, picked);
+      })],
+      secondary: current.length ? ['배포 멈추기', () => busy(async () => {
+        for (const c of current.filter((c) => mine.includes(c))) await deleteDoc(doc(db, 'approvals', `${it.id}~${c}`));
+        approvals = await loadApprovals(); toast('배포를 멈췄어요'); listScreen();
+      })] : ['수정 요청하기', () => feedbackScreen(it)],
+    });
+  }
+  function feedbackScreen(it: Item) {
+    frame({
+      title: '수정 요청', back: () => review(it, 4),
+      body: `<h1 class="big-title">무엇을 고칠까요?</h1>
+        <p class="lead">메모를 남기면 나눔지를 만든 사람이 확인하고 고쳐요.</p>
+        <textarea class="memo" maxlength="1000" placeholder="예: 말씀 2 질문을 조금 더 쉽게 바꿔 주세요"></textarea>`,
+      primary: ['요청 보내기', () => busy(async () => {
+        const text = view.querySelector<HTMLTextAreaElement>('.memo')!.value.trim();
+        if (!text) { toast('메모를 적어 주세요'); throw new Error('empty'); }
+        await addDoc(collection(db, 'feedback'), { gbs: it.id, title: it.title, text, by: user!.email, at: serverTimestamp() });
+        toast('수정 요청을 보냈어요'); listScreen();
+      })],
+    });
+  }
+  function doneScreen(it: Item, picked: string[]) {
+    const c = picked[0];
+    frame({
+      body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
+        <h1 class="big-title center">${picked.map((x) => esc(names[x] ?? x)).join(', ')}에<br />배포했어요</h1>
+        <p class="lead center">${esc(it.title)} · ${esc(it.passage)}</p>`,
+      primary: ['나눔지 보기', () => (location.href = `/${c}/gbs/${it.slug}${emu}`)],
+      secondary: ['목록으로', listScreen],
+    });
+  }
+
+  // ── 시작
+  frame({ body: '<p class="lead center" style="margin-top:40vh">불러오는 중…</p>' });
+  onAuthStateChanged(auth, async (u) => {
+    user = u && !u.isAnonymous ? u : null;
+    if (!user) return loginScreen();
+    try {
+      const s = await getDoc(doc(db, 'staff', user.email!));
+      mine = s.exists() ? (s.data().communities as string[]) ?? [] : [];
+    } catch { mine = []; }
+    if (!mine.length) {
+      return frame({
+        body: `<h1 class="big-title">교역자로 등록되지 않은<br />계정이에요</h1>
+          <p class="lead">${esc(user.email ?? '')}</p>
+          <div class="note">Firebase의 staff 목록에 이 이메일과 맡은 공동체를 등록해야 해요.</div>`,
+        primary: ['다른 계정으로 로그인', () => signOut(auth)],
+      });
+    }
+    try { approvals = await loadApprovals(); } catch { approvals = {}; }
+    listScreen();
+  });
+</script>
+
+<style is:global>
+  body.bare main { padding: 0 0 150px; }
+  .staff .topbar { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 54px; margin: 0 -12px; background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur); }
+  .staff .topbar-title { text-align: center; font-weight: 700; font-size: .95rem; color: var(--muted); }
+  .staff .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: var(--text); cursor: pointer; }
+  .staff .icon-btn[hidden] { visibility: hidden; display: grid; }
+  .staff .icon-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .staff .progress { height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin: 0 0 8px; }
+  .staff .progress[hidden] { display: none; }
+  .staff .progress span { display: block; height: 100%; background: var(--accent); transition: width .25s ease; }
+  .staff .screen { padding-top: 16px; animation: screen-in .22s ease; }
+  @keyframes screen-in { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+  .staff .eyebrow { display: block; margin: 0 0 6px; font-size: .85rem; font-weight: 600; color: var(--muted); }
+  .big-title { margin: 8px 0 10px; font-size: 1.9rem; font-weight: 800; line-height: 1.35; letter-spacing: -0.045em; }
+  .staff .screen-title { margin: 0 0 18px; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.04em; }
+  .staff .lead { margin: 0 0 24px; font-size: 1.02rem; line-height: 1.65; color: var(--muted); }
+  .staff .center { text-align: center; }
+  .staff .key { margin: 0 0 18px; font-size: 1.15rem; font-weight: 700; line-height: 1.55; }
+  .staff .note { padding: 16px 18px; border-radius: 18px; background: var(--card); border: 0.5px solid var(--line); font-size: .93rem; line-height: 1.65; color: var(--muted); }
+  .staff ol, .staff ul { list-style: none; margin: 0; padding: 0; }
+  .staff .sum { counter-reset: s; display: grid; gap: 12px; margin-bottom: 18px; }
+  .staff .sum li { counter-increment: s; position: relative; padding-left: 26px; line-height: 1.7; }
+  .staff .sum li::before { content: counter(s); position: absolute; left: 0; font-weight: 800; color: var(--accent); }
+  .staff .qlist { display: grid; gap: 10px; margin-bottom: 14px; }
+  .staff .qlist li { padding: 16px 18px; border-radius: 18px; background: var(--card); border: 0.5px solid var(--line); }
+  .staff .qlist p { margin: 8px 0 0; line-height: 1.65; }
+  .staff .tag { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+  .staff .songs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .staff .songs span { padding: 8px 14px; border-radius: 999px; background: var(--card); border: 0.5px solid var(--line); font-weight: 600; }
+  .staff .rows { display: grid; gap: 10px; }
+  .staff .rows button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+  .staff .rows .txt { display: flex; flex-direction: column; }
+  .staff .rows strong { font-size: 1.1rem; }
+  .staff .rows .txt span { font-size: .85rem; color: var(--muted); }
+  .staff .chip { padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; background: var(--surface-2); color: var(--muted); }
+  .staff .chip.on { background: var(--accent-soft); color: var(--accent); }
+  .staff .empty { padding: 30px; text-align: center; color: var(--faint); }
+  .staff .checks { display: grid; gap: 10px; }
+  .staff .checks label { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: 20px; background: var(--card); border: 0.5px solid var(--line); font-size: 1.1rem; font-weight: 700; cursor: pointer; }
+  .staff .checks input { width: 24px; height: 24px; accent-color: var(--accent); }
+  .staff .summary-card { display: flex; flex-direction: column; padding: 18px; border-radius: 20px; background: var(--card); border: 0.5px solid var(--line); }
+  .staff .summary-card span { color: var(--muted); font-size: .9rem; }
+  .staff .memo { width: 100%; min-height: 160px; padding: 16px; border-radius: 18px; border: 0.5px solid var(--line); background: var(--card); font: inherit; color: var(--text); line-height: 1.6; resize: vertical; }
+  .staff .done-mark { width: 72px; height: 72px; margin: 60px auto 18px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); }
+  .staff .done-mark svg { width: 36px; height: 36px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .staff .cta { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; z-index: 25; width: min(100%, 640px); padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 4px; background: linear-gradient(to top, var(--bg) 70%, transparent); }
+  .staff .btn.big { width: 100%; min-height: 56px; border-radius: 18px; font-size: 1.05rem; }
+  .staff .text-btn { padding: 12px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .toast { position: fixed; left: 50%; bottom: 120px; transform: translate(-50%, 10px); z-index: 60; padding: 12px 18px; border-radius: 16px; background: var(--ink); color: var(--ink-text); font-weight: 600; font-size: .9rem; opacity: 0; pointer-events: none; transition: all .2s ease; max-width: calc(100% - 32px); text-align: center; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+</style>

@@ -1,17 +1,17 @@
 ---
 // QR코드용 고정 주소: /공동체/gbs/latest  (예: /gil/gbs/latest)
-// 사이트를 다시 만들 때마다 그 공동체의 가장 최신 GBS로 자동 연결됩니다.
-import { getSortedGbs, gbsUrl } from '../../../lib/gbs';
+// 교역자가 승인한 것 중 가장 최신 나눔지로 이동해요.
+import { getSortedGbs, gbsUrl, isReview, approvalId } from '../../../lib/gbs';
 import { communities, type CommunityEntry } from '../../../communities';
 
 export function getStaticPaths() {
   return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
 }
 const { community } = Astro.props as { community: CommunityEntry };
-const base = `/${community.slug}`;
-
-const [latest] = await getSortedGbs(community.slug);
-const target = latest ? gbsUrl(latest, community.slug) : `${base}/gbs`;
+const list = (await getSortedGbs(community.slug)).map((g) => ({
+  url: gbsUrl(g, community.slug), gate: isReview(g) ? approvalId(g) : '',
+}));
+const fallback = `/${community.slug}/gbs`;
 ---
 <!doctype html>
 <html lang="ko">
@@ -20,11 +20,20 @@ const target = latest ? gbsUrl(latest, community.slug) : `${base}/gbs`;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>이번 주 GBS로 이동 중…</title>
-    <meta http-equiv="refresh" content={`0; url=${target}`} />
-    <link rel="canonical" href={target} />
-    <script is:inline define:vars={{ target }}>location.replace(target);</script>
   </head>
   <body style="font-family:sans-serif;padding:24px">
-    <p>이번 주 GBS로 이동 중이에요… <a href={target}>바로 가기</a></p>
+    <p>이번 주 GBS로 이동 중이에요… <a href={fallback}>목록 보기</a></p>
+    <script type="application/json" id="latest" set:html={JSON.stringify({ list, fallback, community: community.slug })} />
+    <script>
+      import { loadApprovals } from '../../../lib/approval';
+      const { list, fallback, community } = JSON.parse(document.getElementById('latest')!.textContent!);
+      const keep = location.search.includes('emulator') ? '?emulator=1' : '';
+      (async () => {
+        let approvals: Record<string, string[]> = {};
+        if (list.some((x: any) => x.gate)) { try { approvals = await loadApprovals(); } catch { /* 연결 실패 */ } }
+        const hit = list.find((x: any) => !x.gate || (approvals[x.gate] ?? []).includes(community));
+        location.replace((hit ? hit.url : fallback) + keep);
+      })();
+    </script>
   </body>
 </html>
