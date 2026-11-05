@@ -16,7 +16,7 @@ export async function getStaticPaths() {
 }
 interface Props { community: CommunityEntry; gbs: Gbs }
 const { community, gbs } = Astro.props;
-const questions = extractQuestions(gbs.body ?? '');
+const questions = extractQuestions(gbs);
 const data = {
   key: `${community.slug}/${gbsSlug(gbs)}`,
   title: gbs.data.title,

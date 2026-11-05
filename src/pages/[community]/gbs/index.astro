@@ -29,7 +29,7 @@ for (const gbs of items) {
   {[...byYear].map(([year, list]) => (
     <section>
       <h2 class="section-title">{year}년</h2>
-      <div class="group">{list.map((gbs) => <GbsListItem gbs={gbs} />)}</div>
+      <div class="group">{list.map((gbs) => <GbsListItem gbs={gbs} community={community.slug} />)}</div>
     </section>
   ))}
 </BaseLayout>

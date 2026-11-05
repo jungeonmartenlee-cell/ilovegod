@@ -20,12 +20,12 @@ const recent = items.slice(1, 4);
 <BaseLayout community={community}>
   <h1 class="page-title">이번 주 말씀</h1>
   {latest ? (
-    <a class="gbs-card" href={gbsUrl(latest)}>
+    <a class="gbs-card" href={gbsUrl(latest, community.slug)}>
       <span class="art"><GbsArt /></span>
       <span class="tinted">
         <span class="t">{latest.data.title}</span>
         <span class="passage">{latest.data.passage}</span>
-        {latest.data.summary && <span class="summary">{latest.data.summary}</span>}
+        <span class="summary">{latest.data.key}</span>
         <span class="foot">
           <span class="btn go">나눔 시작하기</span>
           <span class="meta">{formatDate(latest.data.date)}<br />{latest.data.preacher}</span>
@@ -58,7 +58,7 @@ const recent = items.slice(1, 4);
   {recent.length > 0 && (
     <>
       <h2 class="section-title">지난 GBS</h2>
-      <div class="group">{recent.map((gbs) => <GbsListItem gbs={gbs} />)}</div>
+      <div class="group">{recent.map((gbs) => <GbsListItem gbs={gbs} community={community.slug} />)}</div>
       <p class="more-wrap"><a href={`${base}/gbs`} class="link">모두 보기 <svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a></p>
     </>
   )}

@@ -2,16 +2,19 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 
 export type Gbs = CollectionEntry<'gbs'>;
 
-/** GBS 파일이 속한 공동체 (폴더 이름) — 예: 'gil' */
-export const gbsCommunity = (gbs: Gbs) => gbs.id.split('/')[0];
-/** GBS 주소용 이름 (파일 이름) — 예: '2026-11-01' */
+/** 폴더 이름 — 공동체 폴더(예: 'gil') 또는 여러 공동체용 'shared' */
+const folder = (gbs: Gbs) => gbs.id.split('/')[0];
+/** 이 나눔지를 받는 공동체들 */
+export const gbsTargets = (gbs: Gbs): string[] =>
+  folder(gbs) === 'shared' ? (gbs.data.communities ?? []) : [folder(gbs), ...(gbs.data.communities ?? [])];
+/** 주소용 이름 (파일 이름) — 예: '2026-11-01' */
 export const gbsSlug = (gbs: Gbs) => gbs.id.split('/').slice(1).join('/');
-/** GBS 페이지 주소 — 예: '/gil/gbs/2026-11-01' */
-export const gbsUrl = (gbs: Gbs) => `/${gbsCommunity(gbs)}/gbs/${gbsSlug(gbs)}`;
+/** 공동체 안에서의 GBS 주소 — 예: '/gil/gbs/2026-11-01' */
+export const gbsUrl = (gbs: Gbs, community: string) => `/${community}/gbs/${gbsSlug(gbs)}`;
 
-/** 한 공동체의 공개된 GBS를 최신순으로 */
+/** 한 공동체가 받은 공개 나눔지를 최신순으로 */
 export async function getSortedGbs(community: string): Promise<Gbs[]> {
-  const all = await getCollection('gbs', (gbs) => !gbs.data.draft && gbsCommunity(gbs) === community && gbsSlug(gbs) !== '');
+  const all = await getCollection('gbs', (gbs) => !gbs.data.draft && gbsSlug(gbs) !== '' && gbsTargets(gbs).includes(community));
   return all.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
@@ -28,22 +31,12 @@ export function shortDate(d: Date): string {
   return `${m}.${day}`;
 }
 
-/** 나눔방에서 쓸 질문 목록 — GBS 자료의 '마음 열기 / 말씀 나눔 / 삶 나눔' 번호 목록에서 뽑아요 */
+/** 나눔방에서 쓸 질문 목록 — 나눔 탭의 질문을 그대로 가져와요 */
 export interface RoomQuestion { id: string; section: string; num: number; text: string }
-const QUESTION_SECTIONS = ['마음 열기', '말씀 나눔', '삶 나눔'];
-export function extractQuestions(body: string): RoomQuestion[] {
-  const out: RoomQuestion[] = [];
-  let section = '';
-  for (const raw of body.split('\n')) {
-    const line = raw.trim();
-    const h = line.match(/^##\s+(.+)/);
-    if (h) { section = h[1].trim(); continue; }
-    const q = line.match(/^(\d+)\.\s+(.+)/);
-    if (q && QUESTION_SECTIONS.includes(section)) {
-      const text = q[2].replace(/\*\*/g, '').trim();
-      out.push({ id: `${QUESTION_SECTIONS.indexOf(section)}-${q[1]}`, section, num: Number(q[1]), text });
-    }
+export function extractQuestions(gbs: Gbs): RoomQuestion[] {
+  const out: RoomQuestion[] = gbs.data.share.questions.map((q, i) => ({ id: `q${i + 1}`, section: q.tag, num: 0, text: q.text }));
+  if (!out.some((q) => q.section.includes('기도'))) {
+    out.push({ id: 'pray', section: '함께 기도', num: 0, text: '서로의 기도제목을 나누고 함께 기도해요' });
   }
-  out.push({ id: 'pray', section: '함께 기도', num: 0, text: '서로의 기도제목을 나누고 함께 기도해요' });
   return out;
 }

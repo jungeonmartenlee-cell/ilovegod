@@ -11,7 +11,7 @@ const { community } = Astro.props as { community: CommunityEntry };
 const base = `/${community.slug}`;
 
 const [latest] = await getSortedGbs(community.slug);
-const target = latest ? gbsUrl(latest) : `${base}/gbs`;
+const target = latest ? gbsUrl(latest, community.slug) : `${base}/gbs`;
 ---
 <!doctype html>
 <html lang="ko">

@@ -1,5 +1,6 @@
 ---
-import { render } from 'astro:content';
+// GBS 나눔지 — 요약 · 나눔 · 5일 묵상 · 기도
+// 탭 바로가기 주소: …/gbs/날짜#share, #devo, #pray  (주중에 5일 묵상만 보내고 싶을 때 #devo)
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import FormButton from '../../../components/FormButton.astro';
 import { getSortedGbs, formatDate, gbsSlug, gbsUrl, type Gbs } from '../../../lib/gbs';
@@ -19,132 +20,303 @@ export async function getStaticPaths() {
 
 interface Props { community: CommunityEntry; gbs: Gbs; newer?: Gbs; older?: Gbs }
 const { community, gbs, newer, older } = Astro.props;
-const { Content } = await render(gbs);
-const { title, passage, preacher, date, summary } = gbs.data;
+const d = gbs.data;
+const url = gbsUrl(gbs, community.slug);
+const hasDevo = d.devotions.length > 0;
+const hasPray = d.prayers.length > 0 || d.songs.length > 0;
+const tabs = [
+  { id: 'summary', label: '요약' },
+  { id: 'share', label: '나눔' },
+  ...(hasDevo ? [{ id: 'devo', label: `${d.devotions.length}일 묵상` }] : []),
+  ...(hasPray ? [{ id: 'pray', label: '기도' }] : []),
+];
+const devoKey = `devo:${gbs.id}`;
+const prayerText = `[${d.title} · ${d.passage}] 기도제목\n` + d.prayers.map((p, i) => `${i + 1}. ${p}`).join('\n');
+const yt = (song: string) => `https://www.youtube.com/results?search_query=${encodeURIComponent(song + ' 찬양')}`;
+const chev = '<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 ---
-<BaseLayout community={community} title={`${title} (${passage})`} description={summary ?? `${passage} · ${preacher}`}>
+<BaseLayout community={community} title={`${d.title} (${d.passage})`} description={d.key}>
   <article>
     <header class="gbs-head">
-      <span class="eyebrow">{formatDate(date)}</span>
-      <h1>{title}</h1>
-      <p class="passage">{passage}</p>
-      <p class="muted preacher">설교 · {preacher}</p>
+      <span class="eyebrow">{formatDate(d.date)}{d.service && ` · ${d.service}`} · {d.preacher}</span>
+      <h1>{d.title}</h1>
+      <p class="passage">{d.passage}</p>
+      <p class="key">{d.key}</p>
       <div class="head-actions">
-      <a class="btn open-room" href={`${gbsUrl(gbs)}/share`}>소그룹 나눔 열기</a>
-      <button class="btn ghost share" type="button" data-share>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
-        <span data-share-label>공유</span>
-      </button>
+        <a class="btn open-room" href={`${url}/share`}>소그룹 나눔 열기</a>
+        <button class="btn ghost share" type="button" data-share>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M8 7.5l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>
+          <span data-share-label>공유</span>
+        </button>
       </div>
     </header>
 
-    <div class="prose">
-      <Content />
-    </div>
+    <div data-tabs-anchor></div>
+    <nav class="tabs" role="tablist" aria-label="나눔지">
+      {tabs.map((t, i) => (
+        <button role="tab" type="button" data-tab={t.id} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
+      ))}
+    </nav>
+
+    <!-- 요약 -->
+    <section class="panel" data-panel="summary">
+      <div class="card">
+        <h2 class="label">{d.summary.length}줄 요약</h2>
+        <ol class="sum">{d.summary.map((s) => <li>{s}</li>)}</ol>
+      </div>
+      {d.verses.length > 0 && (
+        <div class="card">
+          <h2 class="label">핵심 구절</h2>
+          {d.verses.map((v) => <blockquote class="verse"><cite>{v.ref}</cite>{v.text}</blockquote>)}
+        </div>
+      )}
+      {d.word && (
+        <div class="card word">
+          <h2 class="label">단어 하나</h2>
+          <div class="word-row">
+            {d.word.original && <span class="orig" lang="he">{d.word.original}</span>}
+            <div><strong>{d.word.word}</strong><p>{d.word.meaning}</p></div>
+          </div>
+        </div>
+      )}
+      {d.flow.length > 0 && (
+        <div class="card">
+          <h2 class="label">설교 흐름</h2>
+          <ol class="flow">
+            {d.flow.map((f) => <li><strong>{f.title}</strong>{f.note && <span>{f.note}</span>}</li>)}
+          </ol>
+        </div>
+      )}
+    </section>
+
+    <!-- 나눔 -->
+    <section class="panel" data-panel="share" hidden>
+      <div class="card qs">
+        <h2 class="label">소그룹 나눔{d.share.minutes && ` · 약 ${d.share.minutes}분`}</h2>
+        <ol>
+          {d.share.questions.map((q) => <li><span class="tag">{q.tag}</span><p>{q.text}</p></li>)}
+        </ol>
+      </div>
+      {d.share.practice && (
+        <div class="card practice">
+          <h2 class="label">이번 주 실천</h2>
+          <p>{d.share.practice}</p>
+        </div>
+      )}
+      <a class="btn full" href={`${url}/share`}>소그룹 나눔 열기</a>
+    </section>
+
+    <!-- 5일 묵상 -->
+    {hasDevo && (
+      <section class="panel" data-panel="devo" hidden data-devo-key={devoKey}>
+        <p class="hint">주중에 날마다 하나씩 묵상하고, 소그룹 단톡방에서 한 줄씩 나눠 보세요.</p>
+        <div class="days" role="tablist">
+          {d.devotions.map((v, i) => (
+            <button type="button" data-day={i} aria-selected={i === 0 ? 'true' : 'false'}><b>{v.day}</b>Day {i + 1}</button>
+          ))}
+        </div>
+        {d.devotions.map((v, i) => (
+          <div class="card devo" data-devo={i} hidden={i !== 0}>
+            <span class="label">DAY {i + 1} · {v.ref}</span>
+            <h3>{v.title}</h3>
+            <p>{v.body}</p>
+            <div class="today"><span>오늘의 질문</span>{v.question}</div>
+            <button type="button" class="btn ghost full check" data-check={i}>오늘 묵상 완료하기</button>
+          </div>
+        ))}
+        <button type="button" class="link-btn" data-share-devo>5일 묵상 링크 보내기 <Fragment set:html={chev} /></button>
+      </section>
+    )}
+
+    <!-- 기도 -->
+    {hasPray && (
+      <section class="panel" data-panel="pray" hidden>
+        {d.prayers.length > 0 && (
+          <div class="card">
+            <h2 class="label">함께 드리는 기도</h2>
+            <ol class="prayers">{d.prayers.map((p) => <li>{p}</li>)}</ol>
+            <button type="button" class="btn ghost full" data-copy={prayerText}>기도제목 복사</button>
+          </div>
+        )}
+        {d.songs.length > 0 && (
+          <div class="card">
+            <h2 class="label">적용 찬양</h2>
+            <p class="hint left">예배나 소그룹 마무리에 함께 불러요. 누르면 찬양을 찾아볼 수 있어요.</p>
+            <ul class="songs">
+              {d.songs.map((s) => <li><a href={yt(s)} target="_blank" rel="noopener">{s}</a></li>)}
+            </ul>
+          </div>
+        )}
+      </section>
+    )}
+
     <FormButton community={community} />
+    <p class="foot-note">설교 원고를 바탕으로 정리했으며, 담당 교역자가 검수합니다. · 성경 본문: 개역개정</p>
   </article>
 
   <nav class="pager group" aria-label="다른 주 GBS">
-    {newer && (
-      <a href={gbsUrl(newer)}>
-        <span class="dir">다음 주</span><span class="t">{newer.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    )}
-    {older && (
-      <a href={gbsUrl(older)}>
-        <span class="dir">지난 주</span><span class="t">{older.data.title}</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </a>
-    )}
-    <a href={`/${community.slug}/gbs`}>
-      <span class="dir">목록</span><span class="t">GBS 전체 보기</span><svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
+    {newer && <a href={gbsUrl(newer, community.slug)}><span class="dir">다음</span><span class="t">{newer.data.title}</span><Fragment set:html={chev} /></a>}
+    {older && <a href={gbsUrl(older, community.slug)}><span class="dir">이전</span><span class="t">{older.data.title}</span><Fragment set:html={chev} /></a>}
+    <a href={`/${community.slug}/gbs`}><span class="dir">목록</span><span class="t">GBS 전체 보기</span><Fragment set:html={chev} /></a>
   </nav>
 </BaseLayout>
 
 <script>
-  // 휴대폰에서는 카카오톡 등으로 바로 공유, 안 되면 주소 복사
-  document.querySelectorAll<HTMLButtonElement>('[data-share]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const data = { title: document.title, url: location.href };
-      try {
-        if (navigator.share) return await navigator.share(data);
-        await navigator.clipboard.writeText(location.href);
-        const label = btn.querySelector('[data-share-label]');
-        if (label) label.textContent = '주소 복사됨';
-      } catch { /* 사용자가 취소함 */ }
-    });
-  });
+  const $$ = <T extends HTMLElement>(s: string) => Array.from(document.querySelectorAll<T>(s));
+
+  // ── 탭 (주소 #share, #devo, #pray 로 바로 열기)
+  const tabs = $$<HTMLButtonElement>('[data-tab]');
+  const panels = $$('[data-panel]');
+  function openTab(id: string, scroll = false) {
+    if (!panels.some((p) => p.dataset.panel === id)) id = 'summary';
+    tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === id)));
+    panels.forEach((p) => (p.hidden = p.dataset.panel !== id));
+    history.replaceState(null, '', id === 'summary' ? location.pathname : `#${id}`);
+    // 이미 아래로 내려와 있으면, 새 탭의 맨 위가 보이도록 올려 줘요
+    const top = document.querySelector<HTMLElement>('[data-tabs-anchor]')!.getBoundingClientRect().top + scrollY - 58;
+    if (scroll && scrollY > top) scrollTo({ top, behavior: 'smooth' });
+  }
+  tabs.forEach((t) => t.addEventListener('click', () => openTab(t.dataset.tab!, true)));
+  if (location.hash) openTab(location.hash.slice(1));
+
+  // ── 5일 묵상 (완료 표시는 이 휴대폰에만 저장)
+  const devo = document.querySelector<HTMLElement>('[data-devo-key]');
+  if (devo) {
+    const key = devo.dataset.devoKey!;
+    let done: Record<string, boolean> = {};
+    try { done = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { done = {}; }
+    const days = $$<HTMLButtonElement>('[data-day]');
+    const cards = $$('[data-devo]');
+    const paint = () => {
+      days.forEach((b) => b.classList.toggle('done', !!done[b.dataset.day!]));
+      $$<HTMLButtonElement>('[data-check]').forEach((b) => {
+        const on = !!done[b.dataset.check!];
+        b.classList.toggle('done', on);
+        b.textContent = on ? '오늘 묵상 완료 ✓' : '오늘 묵상 완료하기';
+      });
+    };
+    days.forEach((b) => b.addEventListener('click', () => {
+      days.forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+      cards.forEach((c) => (c.hidden = c.dataset.devo !== b.dataset.day));
+    }));
+    $$<HTMLButtonElement>('[data-check]').forEach((b) => b.addEventListener('click', () => {
+      done[b.dataset.check!] = !done[b.dataset.check!];
+      try { localStorage.setItem(key, JSON.stringify(done)); } catch { /* 저장 불가 환경 */ }
+      paint();
+    }));
+    paint();
+  }
+
+  // ── 공유 / 복사
+  async function share(url: string, title: string, label?: Element | null) {
+    try {
+      if (navigator.share) return await navigator.share({ title, url });
+      await navigator.clipboard.writeText(url);
+      if (label) label.textContent = '주소 복사됨';
+    } catch { /* 사용자가 취소함 */ }
+  }
+  $$<HTMLButtonElement>('[data-share]').forEach((btn) =>
+    btn.addEventListener('click', () => share(location.href, document.title, btn.querySelector('[data-share-label]'))));
+  document.querySelector('[data-share-devo]')?.addEventListener('click', (e) =>
+    share(`${location.origin}${location.pathname}#devo`, `5일 묵상 · ${document.title}`, e.currentTarget as Element));
+  $$<HTMLButtonElement>('[data-copy]').forEach((btn) => btn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy!); btn.textContent = '복사했어요 ✓'; }
+    catch { btn.textContent = '복사가 안 되는 환경이에요'; }
+    setTimeout(() => (btn.textContent = '기도제목 복사'), 1800);
+  }));
 </script>
 
 <style>
-  .gbs-head { padding: 12px 0 24px; }
-  .gbs-head h1 { margin: 6px 0 6px; font-size: 2.1rem; }
-  .passage { margin: 0; font-size: 1.12rem; font-weight: 600; color: var(--accent); }
-  .preacher { margin: 2px 0 18px; font-size: .9rem; }
+  .gbs-head { padding: 12px 0 20px; }
+  .gbs-head h1 { margin: 6px 0 4px; font-size: 2.3rem; }
+  .passage { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+  .key { margin: 14px 0 18px; padding-left: 14px; border-left: 3px solid var(--accent); font-size: 1.12rem; font-weight: 600; line-height: 1.6; letter-spacing: -0.02em; }
   .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .open-room { min-height: 38px; padding: 0 18px; font-size: .88rem; }
-  .share { min-height: 38px; padding: 0 16px; font-size: .88rem; }
+  .open-room { min-height: 40px; padding: 0 18px; font-size: .9rem; }
+  .share { min-height: 40px; padding: 0 16px; font-size: .88rem; }
   .share svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ── 마크다운 본문 ── */
-  .prose { font-size: 1.04rem; line-height: 1.8; }
-  .prose :global(h2) {
-    margin: 44px 0 14px;
-    font-size: 1.4rem;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-  }
-  .prose :global(p) { margin: 0 0 1em; }
-  .prose :global(strong) { font-weight: 700; }
-
-  /* 성경 본문 */
-  .prose :global(blockquote) {
-    margin: 0 0 1em;
-    padding: 20px 20px 8px;
-    border-radius: var(--radius);
-    background: var(--card);
+  .tabs {
+    position: sticky; top: 54px; z-index: 8;
+    display: flex; gap: 4px; padding: 4px; margin: 0 0 16px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--card) 82%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
     border: 0.5px solid var(--line);
-    font-size: 1.08rem;
-    line-height: 1.9;
   }
-  .prose :global(blockquote p) { margin: 0 0 .75em; }
-  .prose :global(blockquote sup) { font-size: .7em; font-weight: 700; color: var(--accent); margin-right: 3px; }
+  .tabs button {
+    flex: 1; min-height: 38px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+    font: inherit; font-size: .92rem; font-weight: 600; color: var(--muted);
+  }
+  .tabs button[aria-selected='true'] { background: var(--ink); color: var(--ink-text); }
 
-  /* 질문 */
-  .prose :global(ol) {
-    list-style: none;
-    counter-reset: q;
-    margin: 0 0 1em;
-    padding: 0;
-    border-radius: var(--radius);
-    background: var(--card);
-    border: 0.5px solid var(--line);
-    overflow: hidden;
-  }
-  .prose :global(ol > li) {
-    counter-increment: q;
-    position: relative;
-    padding: 16px 18px 16px 50px;
-    line-height: 1.65;
-  }
-  .prose :global(ol > li + li) { border-top: 0.5px solid var(--line); }
-  .prose :global(ol > li::before) {
-    content: counter(q);
-    position: absolute;
-    left: 18px; top: 16px;
-    font-weight: 700;
-    color: var(--accent);
-    font-variant-numeric: tabular-nums;
-  }
-  .prose :global(ul) { padding-left: 1.2em; margin: 0 0 1em; }
-  .prose :global(ul > li) { margin-bottom: .4em; }
-  .prose :global(ul > li::marker) { color: var(--faint); }
-  .prose :global(hr) { border: 0; border-top: 0.5px solid var(--line); margin: 32px 0; }
+  .panel .card { margin-bottom: 12px; }
+  .label { display: block; margin: 0 0 10px; font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--accent); }
+  ol, ul { margin: 0; padding: 0; list-style: none; }
 
-  .pager { margin-top: 48px; }
+  .sum { counter-reset: s; display: grid; gap: 12px; }
+  .sum li { counter-increment: s; position: relative; padding-left: 26px; line-height: 1.7; }
+  .sum li::before { content: counter(s); position: absolute; left: 0; top: 0; font-weight: 800; color: var(--accent); }
+
+  .verse { margin: 0 0 10px; padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); line-height: 1.75; }
+  .verse:last-child { margin-bottom: 0; }
+  .verse cite { display: block; margin-bottom: 2px; font-style: normal; font-size: .78rem; font-weight: 700; color: var(--accent); }
+
+  .word-row { display: flex; gap: 16px; align-items: center; }
+  .orig { flex: none; font-size: 2rem; font-family: 'Times New Roman', serif; color: var(--text); }
+  .word strong { font-size: 1.1rem; }
+  .word p { margin: 2px 0 0; font-size: .95rem; line-height: 1.65; color: var(--muted); }
+
+  .flow { counter-reset: f; display: grid; gap: 12px; }
+  .flow li { counter-increment: f; position: relative; padding-left: 38px; min-height: 26px; }
+  .flow li::before {
+    content: counter(f); position: absolute; left: 0; top: 0;
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--ink); color: var(--ink-text); font-size: .78rem; font-weight: 700;
+  }
+  .flow li:first-child { counter-increment: none; }
+  .flow li:first-child::before { content: '✦'; }
+  .flow strong { display: block; font-weight: 600; line-height: 1.5; }
+  .flow span { display: block; font-size: .85rem; color: var(--muted); }
+
+  .qs ol { display: grid; }
+  .qs li { padding: 14px 0; border-top: 0.5px solid var(--line); }
+  .qs li:first-child { border-top: 0; padding-top: 2px; }
+  .tag { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); }
+  .qs p { margin: 0; line-height: 1.75; }
+  .practice p { margin: 0; line-height: 1.75; }
+  .btn.full { width: 100%; }
+
+  .hint { margin: 0 4px 12px; font-size: .85rem; color: var(--muted); text-align: center; }
+  .hint.left { text-align: left; margin: -4px 0 12px; }
+  .days { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; }
+  .days button {
+    position: relative; flex: 1; min-width: 58px; padding: 8px 0; border-radius: 16px; cursor: pointer;
+    border: 0.5px solid var(--line); background: var(--card); font: inherit; font-size: .75rem; color: var(--muted);
+  }
+  .days b { display: block; font-size: 1.05rem; color: var(--text); }
+  .days button[aria-selected='true'] { background: var(--ink); border-color: var(--ink); color: color-mix(in srgb, var(--ink-text) 70%, transparent); }
+  .days button[aria-selected='true'] b { color: var(--ink-text); }
+  .days button.done::after { content: '✓'; position: absolute; top: 4px; right: 8px; font-size: .7rem; font-weight: 800; color: var(--accent); }
+  .devo h3 { margin: 4px 0 8px; font-size: 1.3rem; }
+  .devo p { margin: 0 0 14px; line-height: 1.8; }
+  .today { padding: 14px 16px; border-radius: 16px; background: var(--accent-soft); line-height: 1.7; margin-bottom: 14px; }
+  .today span { display: block; font-size: .78rem; font-weight: 700; color: var(--accent); }
+  .check.done { background: var(--accent); color: #fff; border-color: transparent; }
+  .link-btn { display: flex; align-items: center; gap: 6px; margin: 4px auto 0; padding: 8px; border: 0; background: none; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; }
+  .link-btn :global(.chev) { color: var(--accent); }
+
+  .prayers { counter-reset: p; display: grid; gap: 12px; margin-bottom: 16px; }
+  .prayers li { counter-increment: p; position: relative; padding-left: 26px; line-height: 1.7; }
+  .prayers li::before { content: counter(p); position: absolute; left: 0; font-weight: 800; color: var(--accent); }
+  .songs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .songs a { display: inline-block; padding: 8px 14px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: .92rem; text-decoration: none; }
+
+  .foot-note { margin: 24px 4px 0; font-size: .75rem; color: var(--faint); text-align: center; line-height: 1.6; }
+
+  .pager { margin-top: 32px; }
   .pager a { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 18px; text-decoration: none; }
   .pager a + a { border-top: 0.5px solid var(--line); }
-  .pager a:active { background: var(--surface-2); }
-  .dir { flex: none; width: 52px; font-size: .82rem; font-weight: 600; color: var(--muted); }
+  .dir { flex: none; width: 40px; font-size: .82rem; font-weight: 600; color: var(--muted); }
   .t { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

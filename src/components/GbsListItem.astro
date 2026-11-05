@@ -1,9 +1,9 @@
 ---
 import { shortDate, gbsUrl, type Gbs } from '../lib/gbs';
-interface Props { gbs: Gbs }
-const { gbs } = Astro.props;
+interface Props { gbs: Gbs; community: string }
+const { gbs, community } = Astro.props;
 ---
-<a class="row" href={gbsUrl(gbs)}>
+<a class="row" href={gbsUrl(gbs, community)}>
   <span class="date">{shortDate(gbs.data.date)}</span>
   <span class="body">
     <span class="title">{gbs.data.title}</span>
