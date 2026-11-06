@@ -360,25 +360,39 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       const ta = view.querySelector<HTMLTextAreaElement>('.field')!;
       ta.oninput = () => { view.querySelector('[data-count]')!.textContent = ta.value.length.toLocaleString(); view.querySelector<HTMLElement>('.field-error')!.hidden = true; };
       view.querySelector<HTMLInputElement>('input[type=file]')!.onchange = async (e) => {
-        const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
+        const input = e.target as HTMLInputElement;
+        const f = input.files?.[0]; if (!f) return;
+        const label = view.querySelector<HTMLElement>('.file-btn span')!;
+        const fn = view.querySelector<HTMLElement>('.file-name')!;
+        const was = label.textContent;
+        label.textContent = '읽는 중…'; fn.textContent = `${f.name} 읽는 중…`; fn.hidden = false;
+        const timeout = <T,>(p: Promise<T>) => Promise.race([p, new Promise<T>((_, no) => setTimeout(() => no(new Error('timeout')), 30000))]);
         try {
           let text = '';
           const lower = f.name.toLowerCase();
           if (lower.endsWith('.pdf') || f.type === 'application/pdf') {
-            text = await pdfText(f);
-            if (text.replace(/\s/g, '').length < 100) return toast('글자를 읽을 수 없는 PDF예요(스캔한 파일 등). 원본 PDF나 워드 파일로 올려 주세요');
+            text = await timeout(pdfText(f));
+            if (text.replace(/\s/g, '').length < 100) return (fn.hidden = true, toast('글자를 읽을 수 없는 PDF예요(스캔한 파일 등). 원본 PDF나 워드 파일로 올려 주세요'));
           } else if (lower.endsWith('.docx')) {
             const mammoth: any = await import('mammoth/mammoth.browser.min.js');
             text = (await (mammoth.default ?? mammoth).extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
           } else if (f.name.toLowerCase().endsWith('.txt') || f.type.startsWith('text/')) {
             text = await f.text();
-          } else { return toast('PDF, 워드(.docx), 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 PDF로 저장해서 올려 주세요'); }
+          } else { fn.hidden = true; return toast('PDF, 워드(.docx), 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 PDF로 저장해서 올려 주세요'); }
           ta.value = text.replace(/\n{3,}/g, '\n\n').trim().slice(0, 60000);
           ta.oninput!(new Event('input'));
           d.fileName = f.name;
-          const fn = view.querySelector<HTMLElement>('.file-name')!; fn.textContent = f.name; fn.hidden = false;
+          fn.textContent = f.name;
           toast('원고를 불러왔어요');
-        } catch (err) { console.error(err); toast('파일을 읽지 못했어요. 내용을 복사해 붙여 넣어 주세요'); }
+        } catch (err: any) {
+          console.error(err);
+          fn.textContent = '';
+          fn.hidden = true;
+          toast(`파일을 읽지 못했어요 (${String(err?.name ?? err?.message ?? '오류').slice(0, 30)}). PDF를 열어 내용을 복사해 붙여 넣어 주세요`);
+        } finally {
+          label.textContent = was;
+          input.value = '';            // 같은 파일을 다시 골라도 불러올 수 있게
+        }
       };
     }
     if (step === 1) {
@@ -407,8 +421,12 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 
   /** PDF에서 글자만 꺼내요 (내 기기 안에서만 읽고, 파일은 어디에도 보내지 않아요) */
   async function pdfText(f: File): Promise<string> {
-    const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.min.mjs');
-    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
+    // 별도 작업 스레드(Worker) 없이 이 화면 안에서 읽어요 — 기기·브라우저마다 Worker 가 막히는 경우가 있어서
+    const [pdfjs, worker]: any[] = await Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.min.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs'),
+    ]);
+    (globalThis as any).pdfjsWorker = worker;
     const task = pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), cMapUrl: '/pdfjs/cmaps/', cMapPacked: true });
     const pdf = await task.promise;
     const pages: string[] = [];
