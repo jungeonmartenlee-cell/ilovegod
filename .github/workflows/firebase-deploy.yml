@@ -29,9 +29,23 @@ jobs:
       # 서버 함수(functions 폴더)가 바뀌었을 때만 함수도 다시 배포해요
       - name: 바뀐 곳 확인
         id: changed
-        run: echo "functions=$(git diff --name-only HEAD~1 HEAD -- functions firebase.json | wc -l)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "functions=$(git diff --name-only HEAD~1 HEAD -- functions firebase.json | wc -l)" >> "$GITHUB_OUTPUT"
+          echo "worker=$(git diff --name-only HEAD~1 HEAD -- worker functions/core.js functions/example.yaml | wc -l)" >> "$GITHUB_OUTPUT"
+      # 스밈 서버 (Cloudflare) — GitHub Secrets 에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID 가 있어야 해요
+      - name: 스밈 서버 배포 (Cloudflare)
+        if: steps.changed.outputs.worker != '0' || github.event_name == 'workflow_dispatch'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "Cloudflare 열쇠가 아직 없어서 건너뛰어요"; exit 0; fi
+          npm ci --prefix functions
+          npm ci --prefix worker
+          cd worker && npx wrangler deploy
+      # Firebase 서버 함수 — 구글 결제(Blaze)를 마친 뒤 저장소 변수 USE_FIREBASE_FUNCTIONS 를 true 로 하면 켜져요
       - name: 서버 함수 배포
-        if: steps.changed.outputs.functions != '0' || github.event_name == 'workflow_dispatch'
+        if: vars.USE_FIREBASE_FUNCTIONS == 'true' && (steps.changed.outputs.functions != '0' || github.event_name == 'workflow_dispatch')
         env:
           SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
