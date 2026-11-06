@@ -222,7 +222,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({
       title: isAdmin ? '개설 신청 확인' : '내 개설 신청', back: listScreen,
       body: `<h1 class="big-title">${list.length ? `개설 신청 ${list.length}건` : '개설 신청이 없어요'}</h1>
-        ${isAdmin ? '<p class="lead">"내용 복사"를 눌러 Claude에게 붙여 넣으면 공동체를 열어 드려요.</p>' : ''}
+        ${isAdmin ? '<p class="lead">"내용 복사"를 눌러 공동체 개설 작업에 붙여 넣어 주세요.</p>' : ''}
         <ul class="rows">${list.map((r) => `<li class="item-card">
           <div class="txt"><strong>${esc(r.name)}</strong><span>/${esc(r.slug)}${r.parents?.length ? ` · ${esc(r.parents.join(' '))}` : ''}</span></div>
           <div class="chips"><span class="chip ${r.status === 'done' ? 'on' : ''}">${STATUS[r.status] ?? r.status}</span>

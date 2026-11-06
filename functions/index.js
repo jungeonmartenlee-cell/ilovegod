@@ -1,10 +1,10 @@
-// 교역자가 올린 설교 원고로 AI '스밈'(Anthropic Claude 사용)이 GBS 나눔지를 만들어 주는 서버 함수
+// 교역자가 올린 설교 원고로 AI '스밈'이 GBS 나눔지를 만들어 주는 서버 함수
 //
 //  makeGbs   : 원고 → 나눔지 내용(JSON). 원고는 어디에도 저장하지 않고, 기록(로그)에도 남기지 않아요.
 //  submitGbs : 교역자가 확인한 나눔지를 GitHub에 올려요 → 사이트가 자동으로 다시 만들어지고 검수 목록에 나타나요.
 //
 //  필요한 비밀값 (Google Cloud → 보안 비밀 관리자에 등록)
-//    ANTHROPIC_API_KEY : Claude API 키
+//    ANTHROPIC_API_KEY : 스밈이 쓰는 AI(Anthropic) API 키
 //    GH_TOKEN          : 이 저장소에만 파일을 쓸 수 있는 GitHub 토큰
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
@@ -30,7 +30,7 @@ const OPTS = { region: 'asia-northeast3', cors: true };
 const EXAMPLE = readFileSync(new URL('./example.yaml', import.meta.url), 'utf8');
 
 // ── 나눔지 형식 (src/content.config.ts 와 같아요)
-// strict=false: Claude에게 줄 형식 / strict=true: 사이트에 올릴 때 글자 수까지 확인
+// strict=false: 스밈에게 줄 형식 / strict=true: 사이트에 올릴 때 글자 수까지 확인
 const schema = (strict) => {
   const str = (max, min = 0) => (strict ? z.string().min(min).max(max) : z.string());
   const arr = (item, max, min = 0) => (strict ? z.array(item).min(min).max(max) : z.array(item));
@@ -111,7 +111,7 @@ const SYSTEM = `당신은 한국 교회 청년 공동체의 GBS(소그룹 성경
 ${EXAMPLE}
 </example>`;
 
-// 에뮬레이터 시험용: 실제 Claude를 부르지 않고 예시 나눔지를 돌려줘요
+// 에뮬레이터 시험용: 실제 스밈(AI)을 부르지 않고 예시 나눔지를 돌려줘요
 async function mockGbs() {
   const { parse } = await import('yaml');
   const e = parse(EXAMPLE);
