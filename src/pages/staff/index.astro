@@ -332,7 +332,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   }
 
   // ── 설교 원고 올리기 — 원고만 넣으면 스밈(AI)이 나눔지를 만들어요 (원고는 저장하지 않아요)
-  type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs; draftId?: string };
+  type Sermon = { text?: string; fileName?: string; pdf?: string; communities?: string[]; note?: string; gbs?: MadeGbs; draftId?: string };
   const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
   const SSTEPS = 4;
@@ -346,7 +346,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         <p class="lead">원고만 넣으면 스밈(AI)이 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
         <label class="file-btn"><input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
           <span>PDF·워드 파일 불러오기</span></label>
-        <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}</p>
+        <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}${d.pdf ? ' · PDF를 그대로 스밈에게 보내요' : ''}</p>
         <textarea class="memo field big" maxlength="60000" placeholder="여기에 원고를 붙여 넣어 주세요">${esc(d.text ?? '')}</textarea>
         <p class="count"><span data-count>${(d.text ?? '').length.toLocaleString()}</span> / 60,000자</p>
         <p class="field-error" hidden></p>
@@ -354,8 +354,9 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
           <span>원고는 나눔지를 만드는 데에만 쓰이고, 이 사이트 어디에도 저장되지 않아요. 운영자를 포함해 누구도 원고를 볼 수 없어요. 보낸 원고는 AI 학습에도 쓰이지 않아요.</span></div>`,
         primary: ['다음', () => {
           const v = view.querySelector<HTMLTextAreaElement>('.field')!.value.trim();
-          if (v.length < 200) return fieldError('원고가 너무 짧아요. 원고 전체를 넣어 주세요');
-          go(1, { text: v });
+          if (v.length >= 200) return go(1, { text: v, pdf: undefined });
+          if (d.pdf) return go(1, { text: '' });            // PDF를 그대로 스밈에게 보내요
+          return fieldError('원고가 너무 짧아요. 원고 전체를 넣어 주세요');
         }] });
       const ta = view.querySelector<HTMLTextAreaElement>('.field')!;
       ta.oninput = () => { view.querySelector('[data-count]')!.textContent = ta.value.length.toLocaleString(); view.querySelector<HTMLElement>('.field-error')!.hidden = true; };
@@ -371,14 +372,22 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
           let text = '';
           const lower = f.name.toLowerCase();
           if (lower.endsWith('.pdf') || f.type === 'application/pdf') {
-            text = await timeout(pdfText(f));
-            if (text.replace(/\s/g, '').length < 100) return (fn.hidden = true, toast('글자를 읽을 수 없는 PDF예요(스캔한 파일 등). 원본 PDF나 워드 파일로 올려 주세요'));
+            text = await timeout(pdfText(f)).catch((err) => { console.warn('pdf text', err); return ''; });
+            // 이 기기에서 글자를 꺼내지 못하면(브라우저 차이, 스캔한 PDF 등) PDF를 그대로 스밈에게 보내요
+            if (text.replace(/\s/g, '').length < 100) {
+              if (f.size > 8 * 1024 * 1024) { fn.hidden = true; return toast('PDF가 너무 커요(8MB 이하). 내용을 복사해 붙여 넣어 주세요'); }
+              d.pdf = await fileBase64(f); d.fileName = f.name;
+              ta.value = ''; ta.oninput!(new Event('input'));
+              fn.textContent = `${f.name} · PDF를 그대로 스밈에게 보내요`;
+              return toast('이 PDF는 스밈이 직접 읽을게요. 다음을 눌러 주세요');
+            }
           } else if (lower.endsWith('.docx')) {
             const mammoth: any = await import('mammoth/mammoth.browser.min.js');
             text = (await (mammoth.default ?? mammoth).extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
           } else if (f.name.toLowerCase().endsWith('.txt') || f.type.startsWith('text/')) {
             text = await f.text();
           } else { fn.hidden = true; return toast('PDF, 워드(.docx), 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 PDF로 저장해서 올려 주세요'); }
+          d.pdf = undefined;
           ta.value = text.replace(/\n{3,}/g, '\n\n').trim().slice(0, 60000);
           ta.oninput!(new Event('input'));
           d.fileName = f.name;
@@ -420,6 +429,13 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   }
 
   /** PDF에서 글자만 꺼내요 (내 기기 안에서만 읽고, 파일은 어디에도 보내지 않아요) */
+  /** 파일을 base64 글자로 (PDF를 그대로 보낼 때) */
+  const fileBase64 = (f: File) => new Promise<string>((ok, no) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] ?? '');
+    r.onerror = () => no(r.error);
+    r.readAsDataURL(f);
+  });
   async function pdfText(f: File): Promise<string> {
     // 별도 작업 스레드(Worker) 없이 이 화면 안에서 읽어요 — 기기·브라우저마다 Worker 가 막히는 경우가 있어서
     const [pdfjs, worker]: any[] = await Promise.all([
@@ -458,10 +474,10 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     };
     making();
     try {
-      const { gbs, id } = await makeGbs(d.text!, d.communities!, d.note ?? '', (n) => {
+      const { gbs, id } = await makeGbs(d.text ?? '', d.communities!, d.note ?? '', (n) => {
         const w = view.querySelector<HTMLElement>('[data-written]');
         if (w && onMaking && run === makeRun) w.textContent = `나눔지를 쓰는 중이에요 · ${n.toLocaleString()}자`;
-      });
+      }, d.pdf);
       // 이 화면에서 기다리고 있었다면 바로 확인 화면으로 (떠났다면 첫 화면과 알림으로 안내해요)
       if (run !== makeRun || !onMaking) return;
       if (!gbs.date) gbs.date = today();
