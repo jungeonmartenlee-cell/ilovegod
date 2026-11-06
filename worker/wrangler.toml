@@ -1,0 +1,15 @@
+# 스밈(AI) 서버 — Cloudflare Workers
+# 비밀값(ANTHROPIC_API_KEY, GH_TOKEN)은 Cloudflare 화면 → Workers → sumim → 설정 → 변수 및 비밀 에 넣어요.
+name = "sumim"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# 설교 원고가 기록(로그)에 남지 않도록 요청 기록을 꺼 둬요
+[observability]
+enabled = false
+
+[[rules]]
+type = "Text"
+globs = ["**/*.yaml"]
+fallthrough = true

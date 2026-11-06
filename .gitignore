@@ -12,3 +12,5 @@ firebase-debug.log
 functions/.secret.local
 functions/.env.local
 public/pdfjs/
+worker/.dev.vars
+worker/.wrangler/

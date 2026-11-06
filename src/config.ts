@@ -18,3 +18,6 @@ export const MAIN = {
   ],
   description: '하나님을 사랑합니다 — 공동체별 GBS(Group Bible Study) 나눔 자료',
 };
+
+/** 스밈(AI) 서버 주소 — Cloudflare 에 올린 뒤 적어요. 비워 두면 Firebase 함수를 써요. */
+export const SUMIM_URL = '';

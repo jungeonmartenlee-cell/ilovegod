@@ -362,9 +362,13 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: () => { makeRun++; sermonStep(2, d); },
       body: `<div class="making"><span class="spinner"></span></div>
         <h1 class="big-title center">스밈이 나눔지를<br />만들고 있어요</h1>
-        <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>` });
+        <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>
+        <p class="lead center small" data-written></p>` });
     try {
-      const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '');
+      const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '', (n) => {
+        const w = view.querySelector<HTMLElement>('[data-written]');
+        if (w && run === makeRun) w.textContent = `나눔지를 쓰는 중이에요 · ${n.toLocaleString()}자`;
+      });
       if (run !== makeRun) return;
       if (!gbs.date) gbs.date = today();
       sermonStep(3, { ...d, gbs });
