@@ -38,7 +38,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 
 <script>
   import { GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut, onAuthStateChanged, type User } from 'firebase/auth';
-  import { doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
+  import { doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, collection, getDocs, query, where, serverTimestamp, onSnapshot } from 'firebase/firestore';
   import { auth, db } from '../../lib/firebase';
   import { loadApprovals } from '../../lib/approval';
   import { makeGbs, submitGbs, aiError, type MadeGbs } from '../../lib/ai';
@@ -69,8 +69,13 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   let isAdmin = false;                // 공동체 개설 신청을 확인하는 운영자
   let approvals: Record<string, string[]> = {};
   let back: (() => void) | null = null;
+  let onList = false;                 // 첫 화면(목록)을 보고 있는지
+  let onMaking = false;               // '만들고 있어요' 화면을 보고 있는지
+  type Draft = { id: string; status: 'making' | 'ready' | 'failed'; gbs?: MadeGbs; communities: string[]; error?: string; at?: any };
+  let drafts: Draft[] = [];
 
   function frame(opts: { title?: string; step?: [number, number]; body: string; primary?: [string, () => void]; secondary?: [string, () => void]; back?: () => void }) {
+    onList = false; onMaking = false;
     titleEl.textContent = opts.title ?? '';
     back = opts.back ?? null; backBtn.hidden = !back;
     document.querySelector<HTMLElement>('.staff .topbar')!.hidden = !back && !opts.title;
@@ -130,6 +135,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       body: `<p class="eyebrow">${esc(user!.email!)}</p>
         <h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
         <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')}</p>
+        ${draftsHtml()}
         <ul class="rows">${mineItems.map((it) => {
           const s = status(it);
           const pullable = (approvals[it.id] ?? []).some((c) => mine.includes(c));
@@ -153,7 +159,64 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => newCommunity(0, {});
     view.querySelector<HTMLElement>('[data-requests]')!.onclick = requestsScreen;
+    bindDrafts();
+    onList = true;
   }
+
+  // ── 스밈이 만든 나눔지 (만드는 중 · 다 만듦 · 실패) — 첫 화면 맨 위에 보여요
+  const ago = (d: Draft) => { const m = Math.max(0, Math.round((Date.now() - (d.at?.toMillis?.() ?? Date.now())) / 60000)); return m < 1 ? '방금' : `${m}분 전`; };
+  const stuck = (d: Draft) => d.status === 'making' && Date.now() - (d.at?.toMillis?.() ?? Date.now()) > 12 * 60000;
+  function draftsHtml() {
+    if (!drafts.length) return '';
+    return `<p class="section-label">스밈이 만든 나눔지</p><ul class="rows">${drafts.map((d) => {
+      const t = d.gbs?.title ? esc(d.gbs.title) : '새 나눔지';
+      if (d.status === 'ready') return `<li class="item-card draft ready"><button type="button" class="item-open" data-draft="${d.id}">
+          <span class="txt"><strong>${t}</strong><span>${esc(d.gbs?.passage ?? '')} · 다 만들었어요</span></span></button>
+          <div class="chips"><button type="button" class="chip on" data-draft="${d.id}">확인하고 올리기</button><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
+      if (d.status === 'failed' || stuck(d)) return `<li class="item-card draft"><span class="txt"><strong>만들지 못했어요</strong><span>${esc(d.error ?? '원고를 다시 올려 주세요.')}</span></span>
+          <div class="chips"><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
+      return `<li class="item-card draft"><span class="txt"><strong><span class="dot"></span>스밈이 만들고 있어요</strong><span>${ago(d)} 시작 · 다 되면 여기서 확인할 수 있어요</span></span></li>`;
+    }).join('')}</ul>`;
+  }
+  function bindDrafts() {
+    view.querySelectorAll<HTMLElement>('[data-draft]').forEach((b) => (b.onclick = () => {
+      const d = drafts.find((x) => x.id === b.dataset.draft); if (!d?.gbs) return;
+      const gbs = { ...d.gbs }; if (!gbs.date) gbs.date = today();
+      confirmSermon({ communities: d.communities, gbs, draftId: d.id });
+    }));
+    view.querySelectorAll<HTMLElement>('[data-drop]').forEach((b) => (b.onclick = async () => {
+      try { await deleteDoc(doc(db, 'drafts', b.dataset.drop!)); toast('지웠어요'); } catch { toast('지우지 못했어요'); }
+    }));
+  }
+  function watchDrafts() {
+    const known = new Map<string, string>();
+    let first = true;
+    onSnapshot(query(collection(db, 'drafts'), where('by', '==', user!.email)), (snap) => {
+      drafts = snap.docs.map((x) => ({ id: x.id, ...(x.data() as any) }))
+        .sort((a, b) => (b.at?.toMillis?.() ?? Date.now()) - (a.at?.toMillis?.() ?? Date.now()));
+      for (const d of drafts) {
+        if (!first && d.status === 'ready' && known.get(d.id) !== 'ready' && !onMaking) madeNotice(d);
+        known.set(d.id, d.status);
+      }
+      first = false;
+      if (onList) listScreen();
+    }, () => {});
+  }
+  // 다 만들었을 때 알려 주기 — 화면 안내 + (허락한 경우) 기기 알림
+  function madeNotice(d: Draft) {
+    const title = d.gbs?.title ?? '나눔지';
+    toast(`스밈이 「${title}」 나눔지를 다 만들었어요`);
+    try { navigator.vibrate?.(200); } catch {}
+    try {
+      if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible')
+        new Notification('스밈이 나눔지를 다 만들었어요', { body: `「${title}」 · 눌러서 확인하고 올려 주세요`, icon: '/favicon.svg' });
+    } catch {}
+    if (document.visibilityState !== 'visible') {
+      const old = document.title; document.title = '✓ 나눔지 완성 · ' + old;
+      document.addEventListener('visibilitychange', () => (document.title = old), { once: true });
+    }
+  }
+  const canNotify = () => 'Notification' in window && Notification.permission === 'default';
 
   // ── 공동체 개설 신청 — 한 화면에 질문 하나씩
   type Req = { name?: string; parents?: string; slug?: string; tagline?: string; worship?: string; pastor?: string; note?: string };
@@ -269,7 +332,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   }
 
   // ── 설교 원고 올리기 — 원고만 넣으면 스밈(AI)이 나눔지를 만들어요 (원고는 저장하지 않아요)
-  type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs };
+  type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs; draftId?: string };
   const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
   const SSTEPS = 4;
@@ -359,22 +422,35 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 
   async function generate(d: Sermon) {
     const run = ++makeRun;
-    frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: () => { makeRun++; sermonStep(2, d); },
-      body: `<div class="making"><span class="spinner"></span></div>
-        <h1 class="big-title center">스밈이 나눔지를<br />만들고 있어요</h1>
-        <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>
-        <p class="lead center small" data-written></p>` });
-    try {
-      const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '', (n) => {
-        const w = view.querySelector<HTMLElement>('[data-written]');
-        if (w && run === makeRun) w.textContent = `나눔지를 쓰는 중이에요 · ${n.toLocaleString()}자`;
+    const making = () => {
+      frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: listScreen,
+        body: `<div class="making"><span class="spinner"></span></div>
+          <h1 class="big-title center">스밈이 나눔지를<br />만들고 있어요</h1>
+          <p class="lead center">원고 길이에 따라 <b>1~3분쯤</b> 걸려요.</p>
+          <p class="lead center small" data-written></p>
+          <div class="privacy wait"><strong>기다리지 않으셔도 돼요</strong>
+            <span>창을 닫아도 스밈은 계속 만들어요. 다 되면 첫 화면 <b>'스밈이 만든 나눔지'</b>에 나타나요.</span></div>`,
+        primary: ['기다리지 않고 나가기', listScreen],
+        ...(canNotify() ? { secondary: ['다 되면 알림 받기', async () => {
+          try { const r = await Notification.requestPermission(); toast(r === 'granted' ? '다 되면 알려 드릴게요' : '알림을 허락하지 않았어요. 첫 화면에서 확인해 주세요'); } catch {}
+          if (onMaking) making();
+        }] as [string, () => void] } : {}),
       });
-      if (run !== makeRun) return;
+      onMaking = true;
+    };
+    making();
+    try {
+      const { gbs, id } = await makeGbs(d.text!, d.communities!, d.note ?? '', (n) => {
+        const w = view.querySelector<HTMLElement>('[data-written]');
+        if (w && onMaking && run === makeRun) w.textContent = `나눔지를 쓰는 중이에요 · ${n.toLocaleString()}자`;
+      });
+      // 이 화면에서 기다리고 있었다면 바로 확인 화면으로 (떠났다면 첫 화면과 알림으로 안내해요)
+      if (run !== makeRun || !onMaking) return;
       if (!gbs.date) gbs.date = today();
-      sermonStep(3, { ...d, gbs });
+      sermonStep(3, { ...d, gbs, draftId: id });
     } catch (e) {
-      if (run !== makeRun) return;
       console.error(e);
+      if (run !== makeRun || !onMaking) return;
       frame({ title: '설교 원고 올리기', back: () => sermonStep(2, d),
         body: `<h1 class="big-title center" style="margin-top:20vh">나눔지를 만들지 못했어요</h1>
           <p class="lead center">${esc(aiError(e, '인터넷 연결을 확인하고 다시 해 주세요.'))}</p>`,
@@ -387,7 +463,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     const g = d.gbs!;
     const field = (key: 'title' | 'passage' | 'preacher' | 'date' | 'service', label: string, ph: string, type = 'text') =>
       `<label class="kv-field"><span>${label}</span><input class="field" data-k="${key}" type="${type}" maxlength="${key === 'service' || key === 'preacher' ? 40 : 80}" placeholder="${ph}" value="${esc(g[key] ?? '')}" /></label>`;
-    frame({ title: '설교 원고 올리기', step: [4, SSTEPS], back: () => sermonStep(2, d),
+    frame({ title: '설교 원고 올리기', step: [4, SSTEPS], back: d.draftId && !d.text ? listScreen : () => sermonStep(2, d),
       body: `<h2 class="screen-title">이렇게 적었어요. 맞나요?</h2>
         <p class="lead">원고에서 찾은 내용이에요. 비어 있거나 틀린 칸만 고쳐 주세요.</p>
         <div class="kv-fields">
@@ -411,7 +487,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         const gbs = { ...g, ...v };
         busy(async () => {
           try {
-            await submitGbs(gbs, d.communities!);
+            await submitGbs(gbs, d.communities!, d.draftId);
           } catch (e) { toast(aiError(e, '올리지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '검수 목록에 올리기'; } return; }
           frame({
             body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
@@ -522,6 +598,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       });
     }
     try { approvals = await loadApprovals(); } catch { approvals = {}; }
+    watchDrafts();
     listScreen();
   });
 </script>
@@ -588,8 +665,15 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .preview-card.col { flex-direction: column; align-items: flex-start; gap: 2px; }
   .staff .privacy { margin-top: 18px; padding: 16px 18px; border-radius: 18px; background: var(--surface-2, var(--card)); display: grid; gap: 4px; }
   .staff .privacy strong { font-size: .92rem; }
+  .staff .privacy.wait { margin-top: 24px; }
+  .staff .making + .big-title { margin-top: 0; }
+  .staff .section-label { margin: 22px 4px 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+  .staff .item-card.draft .txt { display: grid; gap: 2px; padding: 4px 0; }
+  .staff .item-card.draft .txt > span { font-size: .85rem; color: var(--muted); }
+  .staff .item-card.draft .dot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
   .staff .privacy span { font-size: .84rem; line-height: 1.6; color: var(--muted); }
-  .staff .making { display: grid; place-items: center; margin: 18vh 0 22px; }
+  .staff .making { display: grid; place-items: center; margin: 9vh 0 22px; }
   .staff .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .staff .kv-fields { display: grid; gap: 10px; }

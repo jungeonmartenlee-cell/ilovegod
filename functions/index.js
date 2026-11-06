@@ -67,8 +67,20 @@ export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSe
   if (note != null && (typeof note !== 'string' || note.length > 1000)) throw new HttpsError('invalid-argument', '바라는 점은 1,000자까지 적어 주세요.');
   await countUse(email);
 
+  // 만든 나눔지 초안은 drafts 에 잠시 보관해요 (원고는 보관하지 않아요).
+  // 그래서 교역자가 기다리지 않고 화면을 떠나도, 나중에 첫 화면에서 이어서 확인할 수 있어요.
+  await cleanOldDrafts(email);
+  const draft = db.collection('drafts').doc();
+  await draft.set({ by: email, communities, status: 'making', at: FieldValue.serverTimestamp() });
+  const fail = async (msg) => { await draft.update({ status: 'failed', error: msg }).catch(() => {}); return msg; };
+
   const key = ANTHROPIC_API_KEY.value();
-  if (EMULATOR && key === 'mock') return { gbs: await mockGbs() };
+  if (EMULATOR && key === 'mock') {
+    await new Promise((r) => setTimeout(r, Number(process.env.MOCK_DELAY_MS ?? 4000)));
+    const gbs = await mockGbs();
+    await draft.update({ status: 'ready', gbs });
+    return { id: draft.id, gbs };
+  }
 
   const client = new Anthropic({ apiKey: key });
   const user = userMessage(text, note);
@@ -81,21 +93,29 @@ export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSe
       output_config: { format: outputFormat() },
     });
     const msg = await stream.finalMessage();
-    if (msg.stop_reason === 'refusal') throw new HttpsError('failed-precondition', '이 원고로는 나눔지를 만들지 못했어요.');
-    if (!msg.parsed_output) throw new HttpsError('internal', '나눔지를 만들지 못했어요. 다시 해 주세요.');
-    // 비용 확인용으로 글자 수 대신 토큰 수만 남겨요 (원고 내용은 남기지 않아요)
+    if (msg.stop_reason === 'refusal') throw new HttpsError('failed-precondition', await fail('이 원고로는 나눔지를 만들지 못했어요.'));
+    if (!msg.parsed_output) throw new HttpsError('internal', await fail('나눔지를 만들지 못했어요. 원고를 다시 올려 주세요.'));
+    // 비용 확인용으로 토큰 수만 남겨요 (원고 내용은 남기지 않아요)
     console.log('makeGbs usage', JSON.stringify(msg.usage));
-    return { gbs: msg.parsed_output };
+    await draft.update({ status: 'ready', gbs: msg.parsed_output });
+    return { id: draft.id, gbs: msg.parsed_output };
   } catch (e) {
     if (e instanceof HttpsError) throw e;
     console.error('makeGbs error', e instanceof Anthropic.APIError ? `${e.status} ${e.name}` : String(e?.name));
-    throw new HttpsError('unavailable', '스밈이 지금 응답하지 않아요. 잠시 뒤에 다시 해 주세요.');
+    throw new HttpsError('unavailable', await fail('스밈이 지금 응답하지 않아요. 원고를 다시 올려 주세요.'));
   }
 });
 
+// 7일 지난 내 초안은 지워요
+async function cleanOldDrafts(email) {
+  const old = await db.collection('drafts').where('by', '==', email).get();
+  const week = Date.now() - 7 * 86400_000;
+  await Promise.all(old.docs.filter((d) => (d.get('at')?.toMillis?.() ?? 0) < week).map((d) => d.ref.delete()));
+}
+
 // ── 확인한 나눔지를 사이트에 올리기
 export const submitGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
-  const { gbs, communities } = req.data ?? {};
+  const { gbs, communities, draftId } = req.data ?? {};
   const email = await checkStaff(req, communities);
   const parsed = Submit.safeParse(gbs);
   if (!parsed.success) throw new HttpsError('invalid-argument', '제목, 본문, 설교자, 날짜를 확인해 주세요.');
@@ -108,13 +128,24 @@ export const submitGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 
     mkdirSync(dir, { recursive: true });
     let name = date; for (let n = 2; existsSync(`${dir}/${name}.md`); n++) name = `${date}-${n}`;
     writeFileSync(`${dir}/${name}.md`, md);
+    await removeDraft(draftId, email);
     return { slug: name };
   }
 
   try {
-    return { slug: await commitGbs(GH_TOKEN.value(), md, { date, title: parsed.data.title, email }) };
+    const slug = await commitGbs(GH_TOKEN.value(), md, { date, title: parsed.data.title, email });
+    await removeDraft(draftId, email);
+    return { slug };
   } catch (e) {
     console.error('submitGbs github', String(e?.message));
     throw new HttpsError('unavailable', '사이트에 올리지 못했어요. 잠시 뒤에 다시 해 주세요.');
   }
 });
+
+// 사이트에 올린 초안은 지워요 (본인 것만)
+async function removeDraft(id, email) {
+  if (typeof id !== 'string' || !/^[A-Za-z0-9]{10,40}$/.test(id)) return;
+  const ref = db.doc(`drafts/${id}`);
+  const snap = await ref.get();
+  if (snap.exists && snap.get('by') === email) await ref.delete();
+}

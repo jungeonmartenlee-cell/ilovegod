@@ -76,14 +76,15 @@ async function readStream(res: Response, onProgress?: (chars: number) => void): 
   return gbs;
 }
 
-export async function makeGbs(text: string, communities: string[], note: string, onProgress?: (chars: number) => void): Promise<MadeGbs> {
-  if (BASE) return readStream(await post('/make', { text, communities, note }), onProgress);
-  const call = httpsCallable<object, { gbs: MadeGbs }>(fns, 'makeGbs', { timeout: 540_000 });
-  return (await call({ text, communities, note })).data.gbs;
+/** 나눔지를 만들어요. id 는 서버에 잠시 보관된 초안 번호예요 (Firebase 서버일 때만). */
+export async function makeGbs(text: string, communities: string[], note: string, onProgress?: (chars: number) => void): Promise<{ gbs: MadeGbs; id?: string }> {
+  if (BASE) return { gbs: await readStream(await post('/make', { text, communities, note }), onProgress) };
+  const call = httpsCallable<object, { gbs: MadeGbs; id: string }>(fns, 'makeGbs', { timeout: 540_000 });
+  return (await call({ text, communities, note })).data;
 }
 
-export async function submitGbs(gbs: MadeGbs, communities: string[]): Promise<string> {
+export async function submitGbs(gbs: MadeGbs, communities: string[], draftId?: string): Promise<string> {
   if (BASE) return (await (await post('/submit', { gbs, communities })).json()).slug;
   const call = httpsCallable<object, { slug: string }>(fns, 'submitGbs', { timeout: 60_000 });
-  return (await call({ gbs, communities })).data.slug;
+  return (await call({ gbs, communities, draftId })).data.slug;
 }
