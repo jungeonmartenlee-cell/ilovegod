@@ -5,6 +5,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import TabBar from '../components/TabBar.astro';
 import Gates from '../components/Gates.astro';
+import Intro from '../components/Intro.astro';
 import { BRAND, MAIN } from '../config';
 import type { CommunityEntry } from '../communities';
 
@@ -75,6 +76,7 @@ const fullTitle = title
     <style is:global>body.has-tabbar { --tabbar: 84px; }</style>
   </head>
   <body class:list={[{ 'has-tabbar': community && !bare, bare }]}>
+    {!bare && <Intro />}
     {!hideHeader && <Header community={community} />}
     <main>
       <div class="container">

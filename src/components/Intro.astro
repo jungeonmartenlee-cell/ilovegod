@@ -1,0 +1,85 @@
+---
+// 앱을 처음 열 때 한 번 보이는 시작 화면 (같은 창에서 다른 화면으로 옮겨 다닐 때는 다시 나오지 않아요)
+// 화면을 누르면 바로 넘어가고, '동작 줄이기'를 켠 기기에서는 나오지 않아요. 주소에 ?intro 를 붙이면 다시 볼 수 있어요.
+import { BRAND } from '../config';
+const line1 = [...BRAND];
+const line2 = '말씀에 스며듭니다';
+---
+<div class="intro" data-intro aria-hidden="true">
+  <div class="stage">
+    <svg class="heart" viewBox="0 0 24 24">
+      <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z" />
+    </svg>
+    <p class="l1">{line1.map((ch, i) => <span style={`--i:${i}`}>{ch === ' ' ? ' ' : ch}</span>)}</p>
+    <p class="l2">{line2}</p>
+  </div>
+</div>
+<script is:inline>
+  (function () {
+    var el = document.querySelector('[data-intro]');
+    if (!el) return;
+    var force = /[?&]intro\b/.test(location.search);
+    var seen = false;
+    try { seen = sessionStorage.getItem('intro') === '1'; } catch (e) {}
+    if (!seen) seen = /(?:^|;)intro:1/.test(window.name || '');
+    var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if ((seen || calm) && !force) { el.remove(); return; }
+    try { sessionStorage.setItem('intro', '1'); } catch (e) {}
+    window.name = (window.name || '').replace(/(^|;)intro:1/g, '') + ';intro:1';
+    document.documentElement.classList.add('intro-on');
+    var done = false;
+    function end() {
+      if (done) return; done = true;
+      el.classList.add('out');
+      document.documentElement.classList.remove('intro-on');
+      setTimeout(function () { el.remove(); }, 700);
+    }
+    el.addEventListener('click', end);
+    setTimeout(end, 3900);
+  })();
+</script>
+
+<style>
+  .intro {
+    position: fixed; inset: 0; z-index: 1000;
+    display: grid; place-items: center;
+    background: var(--bg);
+    transition: opacity .7s ease, transform .7s cubic-bezier(.2, .7, .2, 1);
+    cursor: pointer;
+  }
+  .intro.out { opacity: 0; transform: scale(1.06); pointer-events: none; }
+  :global(html.intro-on), :global(html.intro-on body) { overflow: hidden; }
+
+  .stage { display: grid; justify-items: center; gap: 14px; padding: 0 24px; text-align: center; }
+  .heart {
+    width: 56px; height: 56px; fill: var(--accent); margin-bottom: 10px;
+    animation: heart 1.1s cubic-bezier(.2, .7, .2, 1) both;
+  }
+  @keyframes heart {
+    0% { opacity: 0; transform: scale(.55); filter: blur(10px); }
+    60% { opacity: 1; transform: scale(1.08); filter: blur(0); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* 하나님을 사랑합니다 — 한 글자씩 번지듯 또렷해져요 */
+  .l1 { margin: 0; font-size: clamp(1.9rem, 8vw, 2.6rem); font-weight: 800; letter-spacing: -.03em; color: var(--text); }
+  .l1 span {
+    display: inline-block;
+    animation: ink .9s cubic-bezier(.2, .7, .2, 1) both;
+    animation-delay: calc(.45s + var(--i) * 70ms);
+  }
+  @keyframes ink {
+    0% { opacity: 0; filter: blur(12px); transform: translateY(10px); }
+    100% { opacity: 1; filter: blur(0); transform: none; }
+  }
+
+  /* 말씀에 스며듭니다 — 넓게 흩어진 글자가 모이며 스며들어요 */
+  .l2 {
+    margin: 0; font-size: clamp(1.05rem, 4.4vw, 1.3rem); font-weight: 600; color: var(--accent);
+    animation: soak 1.4s cubic-bezier(.2, .7, .2, 1) 1.6s both;
+  }
+  @keyframes soak {
+    0% { opacity: 0; letter-spacing: .5em; filter: blur(14px); }
+    100% { opacity: 1; letter-spacing: -.01em; filter: blur(0); }
+  }
+</style>

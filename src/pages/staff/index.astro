@@ -41,6 +41,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   import { doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, collection, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
   import { auth, db } from '../../lib/firebase';
   import { loadApprovals } from '../../lib/approval';
+  import { makeGbs, submitGbs, aiError, type MadeGbs } from '../../lib/ai';
 
   type Item = {
     id: string; slug: string; review: boolean; targets: string[]; title: string; passage: string; preacher: string;
@@ -145,6 +146,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
+      primary: ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })],
       secondary: ['로그아웃', () => signOut(auth)],
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
@@ -220,7 +222,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({
       title: isAdmin ? '개설 신청 확인' : '내 개설 신청', back: listScreen,
       body: `<h1 class="big-title">${list.length ? `개설 신청 ${list.length}건` : '개설 신청이 없어요'}</h1>
-        ${isAdmin ? '<p class="lead">"내용 복사"를 눌러 Claude에게 붙여 넣으면 공동체를 열어 드려요.</p>' : ''}
+        ${isAdmin ? '<p class="lead">"내용 복사"를 눌러 공동체 개설 작업에 붙여 넣어 주세요.</p>' : ''}
         <ul class="rows">${list.map((r) => `<li class="item-card">
           <div class="txt"><strong>${esc(r.name)}</strong><span>/${esc(r.slug)}${r.parents?.length ? ` · ${esc(r.parents.join(' '))}` : ''}</span></div>
           <div class="chips"><span class="chip ${r.status === 'done' ? 'on' : ''}">${STATUS[r.status] ?? r.status}</span>
@@ -264,6 +266,160 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         close(); toast(`${where}에서 거둬들였어요`); after();
       } catch { ok.disabled = false; ok.textContent = '거둬들이기'; toast('처리하지 못했어요. 권한이나 인터넷 연결을 확인해 주세요.'); }
     };
+  }
+
+  // ── 설교 원고 올리기 — 원고만 넣으면 스밈(AI)이 나눔지를 만들어요 (원고는 저장하지 않아요)
+  type Sermon = { text?: string; fileName?: string; communities?: string[]; note?: string; gbs?: MadeGbs };
+  const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
+  const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
+  const SSTEPS = 4;
+  let makeRun = 0;                    // 만드는 중에 뒤로 가면 이전 결과는 버려요
+  function fieldError(msg: string) { const e = view.querySelector<HTMLElement>('.field-error')!; e.textContent = msg; e.hidden = false; }
+  function sermonStep(step: number, d: Sermon) {
+    const go = (n: number, patch: Sermon = {}) => sermonStep(n, { ...d, ...patch });
+    const common = { title: '설교 원고 올리기', step: [step + 1, SSTEPS] as [number, number], back: step ? () => go(step === 3 ? 0 : step - 1) : listScreen };
+    if (step === 0) {
+      frame({ ...common, body: `<h2 class="screen-title">설교 원고를 넣어 주세요</h2>
+        <p class="lead">원고만 넣으면 스밈(AI)이 설교자와 예배를 찾아 적고 나눔지를 만들어요.</p>
+        <label class="file-btn"><input type="file" accept=".pdf,.docx,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden />
+          <span>PDF·워드 파일 불러오기</span></label>
+        <p class="file-name" ${d.fileName ? '' : 'hidden'}>${esc(d.fileName ?? '')}</p>
+        <textarea class="memo field big" maxlength="60000" placeholder="여기에 원고를 붙여 넣어 주세요">${esc(d.text ?? '')}</textarea>
+        <p class="count"><span data-count>${(d.text ?? '').length.toLocaleString()}</span> / 60,000자</p>
+        <p class="field-error" hidden></p>
+        <div class="privacy"><strong>원고는 저장하지 않아요</strong>
+          <span>원고는 나눔지를 만드는 데에만 쓰이고, 이 사이트 어디에도 저장되지 않아요. 운영자를 포함해 누구도 원고를 볼 수 없어요. 보낸 원고는 AI 학습에도 쓰이지 않아요.</span></div>`,
+        primary: ['다음', () => {
+          const v = view.querySelector<HTMLTextAreaElement>('.field')!.value.trim();
+          if (v.length < 200) return fieldError('원고가 너무 짧아요. 원고 전체를 넣어 주세요');
+          go(1, { text: v });
+        }] });
+      const ta = view.querySelector<HTMLTextAreaElement>('.field')!;
+      ta.oninput = () => { view.querySelector('[data-count]')!.textContent = ta.value.length.toLocaleString(); view.querySelector<HTMLElement>('.field-error')!.hidden = true; };
+      view.querySelector<HTMLInputElement>('input[type=file]')!.onchange = async (e) => {
+        const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
+        try {
+          let text = '';
+          const lower = f.name.toLowerCase();
+          if (lower.endsWith('.pdf') || f.type === 'application/pdf') {
+            text = await pdfText(f);
+            if (text.replace(/\s/g, '').length < 100) return toast('글자를 읽을 수 없는 PDF예요(스캔한 파일 등). 원본 PDF나 워드 파일로 올려 주세요');
+          } else if (lower.endsWith('.docx')) {
+            const mammoth: any = await import('mammoth/mammoth.browser.min.js');
+            text = (await (mammoth.default ?? mammoth).extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
+          } else if (f.name.toLowerCase().endsWith('.txt') || f.type.startsWith('text/')) {
+            text = await f.text();
+          } else { return toast('PDF, 워드(.docx), 텍스트(.txt) 파일만 불러올 수 있어요. 한글(.hwp)은 PDF로 저장해서 올려 주세요'); }
+          ta.value = text.replace(/\n{3,}/g, '\n\n').trim().slice(0, 60000);
+          ta.oninput!(new Event('input'));
+          d.fileName = f.name;
+          const fn = view.querySelector<HTMLElement>('.file-name')!; fn.textContent = f.name; fn.hidden = false;
+          toast('원고를 불러왔어요');
+        } catch (err) { console.error(err); toast('파일을 읽지 못했어요. 내용을 복사해 붙여 넣어 주세요'); }
+      };
+    }
+    if (step === 1) {
+      if (mine.length === 1) return go(2, { communities: [...mine] });
+      frame({ ...common, body: `<h2 class="screen-title">어느 공동체의 나눔지로 만들까요?</h2><p class="lead">맡은 공동체 중에서 골라 주세요.</p>
+        <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" ${(d.communities ?? []).includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
+        <p class="field-error" hidden></p>`,
+        primary: ['다음', () => {
+          const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
+          if (!picked.length) return fieldError('공동체를 하나 이상 골라 주세요');
+          go(2, { communities: picked });
+        }] });
+    }
+    if (step === 2) {
+      const ask = () => {
+        const note = view.querySelector<HTMLTextAreaElement>('.field')?.value.trim() ?? '';
+        generate({ ...d, note });
+      };
+      frame({ ...common, back: () => (mine.length === 1 ? go(0) : go(1)), body: `<h2 class="screen-title">나눔지에 바라는 점이 있나요?</h2>
+        <p class="lead">강조할 내용, 적용 찬양 등을 적어 주세요. 없으면 바로 만들어도 돼요.</p>
+        <textarea class="memo field" maxlength="1000" placeholder="예: 새가족이 많으니 마음 열기 질문을 쉽게 해 주세요">${esc(d.note ?? '')}</textarea>`,
+        primary: ['나눔지 만들기', ask] });
+    }
+    if (step === 3) confirmSermon(d);
+  }
+
+  /** PDF에서 글자만 꺼내요 (내 기기 안에서만 읽고, 파일은 어디에도 보내지 않아요) */
+  async function pdfText(f: File): Promise<string> {
+    const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.min.mjs');
+    pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default;
+    const task = pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), cMapUrl: '/pdfjs/cmaps/', cMapPacked: true });
+    const pdf = await task.promise;
+    const pages: string[] = [];
+    for (let i = 1; i <= Math.min(pdf.numPages, 60); i++) {
+      const tc = await (await pdf.getPage(i)).getTextContent();
+      pages.push(tc.items.map((it: any) => (it.str ?? '') + (it.hasEOL ? '\n' : '')).join(''));
+    }
+    await task.destroy();
+    return pages.join('\n\n');
+  }
+
+  async function generate(d: Sermon) {
+    const run = ++makeRun;
+    frame({ title: '설교 원고 올리기', step: [3, SSTEPS], back: () => { makeRun++; sermonStep(2, d); },
+      body: `<div class="making"><span class="spinner"></span></div>
+        <h1 class="big-title center">스밈이 나눔지를<br />만들고 있어요</h1>
+        <p class="lead center">1~3분쯤 걸려요. 이 화면을 닫지 말아 주세요.</p>` });
+    try {
+      const gbs = await makeGbs(d.text!, d.communities!, d.note ?? '');
+      if (run !== makeRun) return;
+      if (!gbs.date) gbs.date = today();
+      sermonStep(3, { ...d, gbs });
+    } catch (e) {
+      if (run !== makeRun) return;
+      console.error(e);
+      frame({ title: '설교 원고 올리기', back: () => sermonStep(2, d),
+        body: `<h1 class="big-title center" style="margin-top:20vh">나눔지를 만들지 못했어요</h1>
+          <p class="lead center">${esc(aiError(e, '인터넷 연결을 확인하고 다시 해 주세요.'))}</p>`,
+        primary: ['다시 만들기', () => generate(d)], secondary: ['목록으로', listScreen] });
+    }
+  }
+
+  // 나눔지에 적힌 설교 정보 확인 — 원고에서 못 찾은 칸만 채우면 돼요
+  function confirmSermon(d: Sermon) {
+    const g = d.gbs!;
+    const field = (key: 'title' | 'passage' | 'preacher' | 'date' | 'service', label: string, ph: string, type = 'text') =>
+      `<label class="kv-field"><span>${label}</span><input class="field" data-k="${key}" type="${type}" maxlength="${key === 'service' || key === 'preacher' ? 40 : 80}" placeholder="${ph}" value="${esc(g[key] ?? '')}" /></label>`;
+    frame({ title: '설교 원고 올리기', step: [4, SSTEPS], back: () => sermonStep(2, d),
+      body: `<h2 class="screen-title">이렇게 적었어요. 맞나요?</h2>
+        <p class="lead">원고에서 찾은 내용이에요. 비어 있거나 틀린 칸만 고쳐 주세요.</p>
+        <div class="kv-fields">
+          ${field('title', '제목', '설교 제목')}
+          ${field('passage', '본문', '예: 창세기 22:4–14')}
+          ${field('preacher', '설교자', '예: 이준건 목사')}
+          ${field('date', '날짜', '', 'date')}
+          ${field('service', '예배', '없으면 비워 둬도 돼요')}
+        </div>
+        <ul class="svc-chips">${SERVICES.map((x) => `<li><button type="button" class="chip" data-svc="${x}">${x}</button></li>`).join('')}</ul>
+        <div class="preview-card col"><span class="sub">핵심 메시지</span><strong class="key">${esc(g.key)}</strong></div>
+        <p class="field-error" hidden></p>
+        <p class="lead small">올리면 검수 목록에 나타나요. 나눔지 내용은 거기서 한 단계씩 확인해 주세요.</p>`,
+      primary: ['검수 목록에 올리기', () => {
+        const v: any = {};
+        view.querySelectorAll<HTMLInputElement>('[data-k]').forEach((i) => (v[i.dataset.k!] = i.value.trim()));
+        if (!v.title) return fieldError('제목을 적어 주세요');
+        if (!v.passage) return fieldError('본문을 적어 주세요');
+        if (!v.preacher) return fieldError('원고에 설교자가 없어요. 설교자를 적어 주세요');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return fieldError('날짜를 골라 주세요');
+        const gbs = { ...g, ...v };
+        busy(async () => {
+          try {
+            await submitGbs(gbs, d.communities!);
+          } catch (e) { toast(aiError(e, '올리지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '검수 목록에 올리기'; } return; }
+          frame({
+            body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
+              <h1 class="big-title center">검수 목록에 올렸어요</h1>
+              <p class="lead center">${esc(gbs.title)} · ${esc(gbs.passage)}<br />사이트에 반영되기까지 3분쯤 걸려요.<br />그다음 이 화면을 새로 고치면 검수 목록에 나타나요.</p>`,
+            primary: ['새로 고치기', () => location.reload()], secondary: ['목록으로', listScreen],
+          });
+        });
+      }] });
+    view.querySelectorAll<HTMLElement>('[data-svc]').forEach((b) => (b.onclick = () => {
+      view.querySelector<HTMLInputElement>('[data-k="service"]')!.value = b.dataset.svc!;
+    }));
   }
 
   // ── 3. 검수 단계 (한 화면에 하나씩)
@@ -416,6 +572,32 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .kv { display: grid; grid-template-columns: 84px 1fr; gap: 10px; font-size: .95rem; }
   .staff .kv span { color: var(--muted); }
   .staff .kv strong { font-weight: 600; }
+  .staff .lead.small { margin: 18px 0 8px; font-size: .9rem; }
+  .staff .pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .staff .pick-btn { width: 100%; padding: 16px 12px; border-radius: 18px; border: 0.5px solid var(--line); background: var(--card); font: inherit; font-weight: 700; color: var(--text); cursor: pointer; }
+  .staff .pick-btn.on { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent); }
+  .staff .field.big { min-height: 42vh; font-size: .95rem; line-height: 1.7; }
+  .staff .file-btn { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px; padding: 10px 16px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .9rem; cursor: pointer; }
+  .staff .file-name { margin: -2px 0 10px 4px; font-size: .85rem; color: var(--muted); }
+  .staff .file-name[hidden] { display: none; }
+  .staff .count { margin: 6px 4px 0; text-align: right; font-size: .8rem; color: var(--faint); }
+  .staff .preview-card.col { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .staff .privacy { margin-top: 18px; padding: 16px 18px; border-radius: 18px; background: var(--surface-2, var(--card)); display: grid; gap: 4px; }
+  .staff .privacy strong { font-size: .92rem; }
+  .staff .privacy span { font-size: .84rem; line-height: 1.6; color: var(--muted); }
+  .staff .making { display: grid; place-items: center; margin: 18vh 0 22px; }
+  .staff .spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .staff .kv-fields { display: grid; gap: 10px; }
+  .staff .kv-field { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 10px; }
+  .staff .kv-field span { font-size: .9rem; color: var(--muted); font-weight: 600; }
+  .staff .kv-field .field { margin: 0; width: 100%; min-width: 0; padding: 13px 15px; border-radius: 14px; border: 0.5px solid var(--line); background: var(--card); font: inherit; font-size: 1rem; color: var(--text); outline: none; -webkit-appearance: none; appearance: none; }
+  .staff .kv-field input[type=date] { min-height: 49px; }
+  .staff .svc-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px 74px; padding: 0; }
+  .staff .preview-card .key { font-size: 1.02rem; font-weight: 700; line-height: 1.55; }
+  .staff .preview-card .sub { font-size: .9rem; letter-spacing: 0; color: var(--muted); font-weight: 500; }
+  .staff .item-card .txt { display: flex; flex-direction: column; }
+  .staff .item-card .txt span { font-size: .85rem; color: var(--muted); }
   .staff .chip.copy { background: var(--surface-2); color: var(--text); }
   .staff .chip.pull { background: rgba(229, 72, 77, 0.1); color: #e5484d; }
   .staff .chip.pull:active { transform: scale(.95); }
