@@ -2,10 +2,12 @@
 // 앱을 처음 열 때 한 번 보이는 시작 화면 (같은 창에서 다른 화면으로 옮겨 다닐 때는 다시 나오지 않아요)
 // 화면을 누르면 바로 넘어가고, '동작 줄이기'를 켠 기기에서는 나오지 않아요. 주소에 ?intro 를 붙이면 다시 볼 수 있어요.
 import { BRAND } from '../config';
-const line1 = [...BRAND];
-const line2 = '말씀에 스며듭니다';
+// 화면마다 문구를 바꿀 수 있어요 (교역자 화면: '설교 원고에서' · '나눔지까지 1분')
+interface Props { line1?: string; line2?: string; id?: string }
+const { line1: l1 = BRAND, line2 = '말씀에 스며듭니다', id = 'intro' } = Astro.props;
+const line1 = [...l1];
 ---
-<div class="intro" data-intro aria-hidden="true">
+<div class="intro" data-intro data-key={id} aria-hidden="true">
   <div class="stage">
     <svg class="heart" viewBox="0 0 24 24">
       <path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z" />
@@ -18,14 +20,15 @@ const line2 = '말씀에 스며듭니다';
   (function () {
     var el = document.querySelector('[data-intro]');
     if (!el) return;
+    var key = el.getAttribute('data-key') || 'intro';
     var force = /[?&]intro\b/.test(location.search);
     var seen = false;
-    try { seen = sessionStorage.getItem('intro') === '1'; } catch (e) {}
-    if (!seen) seen = /(?:^|;)intro:1/.test(window.name || '');
+    try { seen = sessionStorage.getItem(key) === '1'; } catch (e) {}
+    if (!seen) seen = new RegExp('(?:^|;)' + key + ':1').test(window.name || '');
     var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if ((seen || calm) && !force) { el.remove(); return; }
-    try { sessionStorage.setItem('intro', '1'); } catch (e) {}
-    window.name = (window.name || '').replace(/(^|;)intro:1/g, '') + ';intro:1';
+    try { sessionStorage.setItem(key, '1'); } catch (e) {}
+    window.name = (window.name || '').replace(new RegExp('(^|;)' + key + ':1', 'g'), '') + ';' + key + ':1';
     document.documentElement.classList.add('intro-on');
     var done = false;
     function end() {

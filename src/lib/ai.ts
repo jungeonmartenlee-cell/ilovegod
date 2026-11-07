@@ -96,3 +96,14 @@ export async function submitGbs(gbs: MadeGbs, communities: string[], draftId?: s
   const call = httpsCallable<object, { slug: string }>(fns, 'uploadGbs', { timeout: 60_000 });
   return (await call({ gbs, communities, draftId })).data.slug;
 }
+
+/** 새 공동체 만들기 — 이름만 보내면 주소(영어 이름)는 서버에서 정해요 */
+export async function createCommunity(name: string): Promise<{ slug: string; name: string }> {
+  const call = httpsCallable<object, { slug: string; name: string }>(fns, 'createCommunity', { timeout: 60_000 });
+  return (await call({ name })).data;
+}
+/** 공동체 소개 고치기 */
+export async function saveCommunity(slug: string, edit: { name: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] }) {
+  const call = httpsCallable<object, { ok: boolean }>(fns, 'saveCommunity', { timeout: 60_000 });
+  await call({ slug, edit });
+}
