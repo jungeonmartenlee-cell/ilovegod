@@ -4,6 +4,7 @@ import FormButton from '../../components/FormButton.astro';
 import GbsArt from '../../components/GbsArt.astro';
 import { getSortedGbs, formatDate, gbsUrl, gate } from '../../lib/gbs';
 import { communities, type CommunityEntry } from '../../communities';
+import { qrSvg } from '../../lib/qr-art';
 
 export function getStaticPaths() {
   return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
@@ -14,6 +15,9 @@ const { mainName, parentNames, tagline, intro } = community;
 const worship = community.worship ?? [];
 
 const items = await getSortedGbs(community.slug);
+// 우리 공동체 QR — 찍으면 시작 화면을 지나 이 공동체로 바로 들어와요
+const qrUrl = new URL(base, Astro.site).href;
+const qr = qrSvg(qrUrl, mainName);
 ---
 <BaseLayout community={community}>
   <h1 class="page-title">이번 주 말씀</h1>
@@ -57,9 +61,29 @@ const items = await getSortedGbs(community.slug);
     </>
   )}
 
+  <section class="share-qr">
+    <h2 class="section-title">우리 공동체 QR</h2>
+    <div class="card qr-card">
+      <div class="qr" set:html={qr} />
+      <p class="muted">휴대폰 카메라로 찍으면 {mainName}에 바로 들어와요.<br />친구에게 보여 주거나 저장해 두세요.</p>
+      <button type="button" class="btn" data-save-qr data-url={qrUrl} data-name={mainName}>QR 저장하기</button>
+    </div>
+  </section>
 </BaseLayout>
 
+<script>
+  import { saveQrPoster } from '../../lib/qr-art';
+  document.querySelectorAll<HTMLButtonElement>('[data-save-qr]').forEach((b) => (b.onclick = () => {
+    saveQrPoster(b.dataset.url!, b.dataset.name!, b.dataset.name!);
+  }));
+</script>
+
 <style>
+  .share-qr { margin-top: 36px; }
+  .qr-card { display: grid; justify-items: center; gap: 14px; padding: 26px 20px; text-align: center; }
+  .qr-card .qr { width: min(64vw, 240px); padding: 12px; background: #fff; border-radius: 18px; }
+  .qr-card .qr :global(svg) { display: block; width: 100%; height: auto; }
+  .qr-card p { margin: 0; font-size: .9rem; line-height: 1.6; }
   .page-title { margin: 20px 0 16px; font-size: 1.9rem; }
 
   .gbs-card {

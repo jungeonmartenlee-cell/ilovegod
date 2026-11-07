@@ -149,7 +149,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
             </div></li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>
         <ul class="menu">
-          <li><button type="button" data-qr><span>공동체 QR 띄우기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
+          <li><button type="button" data-qr><span>QR 내려받기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
@@ -220,19 +220,28 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   }
   const canNotify = () => 'Notification' in window && Notification.permission === 'default';
 
-  // ── 공동체 QR — 예배 후 대형 화면에 띄우거나, 링크를 단톡방에 보내요
+  // ── QR 내려받기 — 공동체 광고 시간에 PPT로 띄우거나 주보에 넣어요
   function qrScreen() {
-    const link = (c: string) => `${location.origin}/${c}`;
+    const site = (import.meta.env.SITE as string | undefined)?.replace(/\/$/, '') || location.origin;
+    const link = (c: string) => `${site}/${c}`;
+    const rows: [string, string, string | undefined][] = [
+      ['', '하나님을 사랑합니다', undefined],
+      ...mine.map((c) => [c, names[c] ?? c, names[c] ?? c] as [string, string, string]),
+    ];
     frame({
-      title: '공동체 QR', back: listScreen,
-      body: `<h1 class="big-title">공동체 QR</h1>
-        <p class="lead">예배 후 대형 화면에 띄우면 성도들이 휴대폰 카메라로 바로 들어와요.</p>
-        <ul class="rows">${mine.map((c) => `<li class="item-card">
-          <span class="txt"><strong>${esc(names[c] ?? c)}</strong><span>${esc(link(c).replace(/^https?:\/\//, ''))}</span></span>
-          <div class="chips"><a class="chip on" href="/${c}/qr" target="_blank" rel="noopener">QR 띄우기</a>
-            <button type="button" class="chip" data-copy-link="${c}">링크 복사</button></div></li>`).join('')}</ul>
-        <p class="lead small">QR 화면에서 <b>전체 화면</b>(또는 F 키)을 누르면 크게 보여요. <b>이미지 저장</b>으로 주보나 PPT에 넣을 수도 있어요.</p>`,
+      title: 'QR 내려받기', back: listScreen,
+      body: `<h1 class="big-title">QR 내려받기</h1>
+        <p class="lead">QR 가운데에 이름이 들어가 있어서 QR만 봐도 어느 공동체인지 알 수 있어요. PPT나 주보에 그대로 넣어 주세요.</p>
+        <ul class="rows">${rows.map(([c, title], i) => `<li class="item-card">
+          <span class="txt"><strong>${esc(title)}</strong><span>${esc(link(c).replace(/^https?:\/\//, '').replace(/\/$/, ''))}${c ? '' : ' · 메인 화면'}</span></span>
+          <div class="chips"><button type="button" class="chip on" data-save-qr="${i}">QR 저장</button>
+            <button type="button" class="chip" data-copy-link="${c}">링크 복사</button></div></li>`).join('')}</ul>`,
     });
+    view.querySelectorAll<HTMLElement>('[data-save-qr]').forEach((b) => (b.onclick = async () => {
+      const [c, title, label] = rows[Number(b.dataset.saveQr)];
+      const { saveQrPoster } = await import('../../lib/qr-art');
+      await saveQrPoster(link(c), title, label);
+    }));
     view.querySelectorAll<HTMLElement>('[data-copy-link]').forEach((b) => (b.onclick = async () => {
       try { await navigator.clipboard.writeText(link(b.dataset.copyLink!)); toast('링크를 복사했어요'); } catch { toast('복사가 안 되는 환경이에요'); }
     }));
