@@ -4,10 +4,14 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { BRAND, MAIN } from '../config';
 import { communities } from '../communities';
+import { qrSvg, qrInitial } from '../lib/qr-art';
 
-const cards = await Promise.all(
-  communities.map(async (c) => ({ c })),
-);
+// 공동체를 누르면 뜨는 QR 팝업 — QR은 미리 만들어 둬요
+const cards = communities.map((c) => {
+  const url = new URL(`/${c.slug}`, Astro.site).href;
+  const initial = qrInitial(c.slug);
+  return { c, url, initial, qr: qrSvg(url, initial) };
+});
 ---
 <BaseLayout>
   <section class="hero">
@@ -27,7 +31,7 @@ const cards = await Promise.all(
   <ul class="list group">
     {cards.map(({ c }) => (
       <li>
-        <a class="community" href={`/${c.slug}`}>
+        <a class="community" href={`/${c.slug}`} data-qr-open={c.slug}>
           <span class="top">
             <span class="name-wrap">
               <strong class="name">{c.mainName}</strong>
@@ -44,6 +48,21 @@ const cards = await Promise.all(
     ))}
   </ul>
 
+  <dialog class="qr-sheet" data-qr-sheet aria-label="공동체 QR">
+    <button type="button" class="close" data-qr-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
+    {cards.map(({ c, url, initial, qr }) => (
+      <div class="sheet-body" data-qr-for={c.slug} data-url={url} data-name={c.mainName} data-initial={initial} hidden>
+        <p class="s-names">{c.parentNames}</p>
+        <h2>{c.mainName}</h2>
+        {c.tagline && <p class="s-tag">{c.tagline}</p>}
+        <div class="s-qr" set:html={qr} />
+        <p class="s-how">휴대폰 카메라로 찍으면 {c.mainName}에 바로 들어와요</p>
+        <a class="btn s-go" href={`/${c.slug}`}>바로 이동하기</a>
+        <button type="button" class="s-save" data-qr-save>QR 저장하기</button>
+      </div>
+    ))}
+  </dialog>
+
   <div class="bottom-row">
     <a class="staff-btn" href="/staff">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.6-3.6 3.6-6 7.5-6s6.9 2.4 7.5 6" /></svg>
@@ -52,7 +71,47 @@ const cards = await Promise.all(
   </div>
 </BaseLayout>
 
+<script>
+  import { saveQrPoster } from '../lib/qr-art';
+  const sheet = document.querySelector<HTMLDialogElement>('[data-qr-sheet]')!;
+  const bodies = sheet.querySelectorAll<HTMLElement>('[data-qr-for]');
+  document.querySelectorAll<HTMLAnchorElement>('[data-qr-open]').forEach((a) => a.addEventListener('click', (e) => {
+    if (!sheet.showModal || e.metaKey || e.ctrlKey || e.shiftKey) return;   // 팝업을 못 쓰면 그냥 이동해요
+    e.preventDefault();
+    bodies.forEach((b) => (b.hidden = b.dataset.qrFor !== a.dataset.qrOpen));
+    sheet.showModal();
+  }));
+  const close = () => sheet.close();
+  sheet.querySelector<HTMLElement>('[data-qr-close]')!.onclick = close;
+  sheet.addEventListener('click', (e) => { if (e.target === sheet) close(); });   // 바깥을 누르면 닫혀요
+  sheet.querySelectorAll<HTMLElement>('[data-qr-save]').forEach((b) => (b.onclick = () => {
+    const d = (b.closest('[data-qr-for]') as HTMLElement).dataset;
+    saveQrPoster(d.url!, d.name!, d.initial!);
+  }));
+</script>
+
 <style>
+  .qr-sheet {
+    width: min(92vw, 380px); max-height: 92dvh; margin: auto; padding: 0;
+    border: 0; border-radius: 28px; background: var(--card); color: var(--text);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .25);
+  }
+  .qr-sheet::backdrop { background: rgba(0, 0, 0, .45); backdrop-filter: blur(6px); }
+  .qr-sheet[open] { animation: pop .28s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes pop { from { opacity: 0; transform: translateY(16px) scale(.97); } }
+  .close { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--surface-2); cursor: pointer; }
+  .close svg { width: 16px; height: 16px; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+  .sheet-body { display: grid; justify-items: center; padding: 34px 24px 22px; text-align: center; }
+  .sheet-body[hidden] { display: none; }
+  .s-names { margin: 0 0 4px; font-size: .66rem; font-weight: 600; letter-spacing: .16em; color: var(--faint); }
+  .sheet-body h2 { margin: 0; font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; }
+  .s-tag { margin: 4px 0 0; font-size: .92rem; color: var(--accent); font-weight: 600; }
+  .s-qr { width: min(62vw, 220px); margin: 20px 0 12px; padding: 12px; background: #fff; border-radius: 18px; }
+  .s-qr :global(svg) { display: block; width: 100%; height: auto; }
+  .s-how { margin: 0 0 18px; font-size: .85rem; color: var(--muted); }
+  .s-go { width: 100%; }
+  .s-save { margin-top: 10px; padding: 8px 12px; border: 0; background: none; font: inherit; font-size: .9rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+
   .hero { text-align: center; padding: 40px 0 8px; }
   .mark { width: 40px; height: 40px; fill: var(--heart); }
   .hero h1 { margin: 12px 0 6px; font-size: 2.2rem; letter-spacing: -0.05em; word-spacing: .14em; }
