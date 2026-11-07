@@ -18,6 +18,17 @@ const items = all.map((g) => {
     questions: g.data.share.questions, practice: g.data.share.practice ?? '',
     devotions: g.data.devotions.map((v) => ({ day: v.day, ref: v.ref, title: v.title, question: v.question })),
     prayers: g.data.prayers, songs: g.data.songs,
+    // 교역자 화면에서 고칠 수 있는 나눔지 (shared 폴더) — 고칠 때 쓰는 전체 내용
+    file: folderOf(g.id) === 'shared' ? gbsSlug(g) : '',
+    full: folderOf(g.id) === 'shared' ? {
+      title: g.data.title, passage: g.data.passage, preacher: g.data.preacher, service: g.data.service ?? '',
+      date: g.data.date.toISOString().slice(0, 10), key: g.data.key, summary: g.data.summary, verses: g.data.verses,
+      word: g.data.word ? { original: g.data.word.original ?? '', word: g.data.word.word, meaning: g.data.word.meaning } : null,
+      flow: g.data.flow.map((f) => ({ title: f.title, note: f.note ?? '' })),
+      share: { minutes: g.data.share.minutes ?? 40, questions: g.data.share.questions, practice: g.data.share.practice ?? '' },
+      devotions: g.data.devotions.map((v) => ({ ref: v.ref, title: v.title, body: v.body, question: v.question })),
+      prayers: g.data.prayers, songs: g.data.songs,
+    } : null,
   };
 });
 const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
@@ -42,13 +53,13 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   import { doc, getDoc, setDoc, deleteDoc, addDoc, updateDoc, collection, getDocs, query, where, serverTimestamp, onSnapshot } from 'firebase/firestore';
   import { auth, db } from '../../lib/firebase';
   import { loadApprovals } from '../../lib/approval';
-  import { makeGbs, submitGbs, createCommunity, saveCommunity, aiError, type MadeGbs } from '../../lib/ai';
+  import { makeGbs, submitGbs, createCommunity, saveCommunity, updateGbs, deleteGbs, aiError, type MadeGbs } from '../../lib/ai';
 
   type Item = {
     id: string; slug: string; review: boolean; targets: string[]; title: string; passage: string; preacher: string;
     date: string; service: string; key: string; summary: string[]; questions: { tag: string; text: string }[];
     practice: string; devotions: { day: string; ref: string; title: string; question: string }[];
-    prayers: string[]; songs: string[];
+    prayers: string[]; songs: string[]; file: string; full: MadeGbs | null;
   };
   type Info = { name: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] };
   const { items, names, info } = JSON.parse(document.getElementById('staff-data')!.textContent!) as { items: Item[]; names: Record<string, string>; info: Record<string, Info> };
@@ -133,7 +144,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   const status = (it: Item) => {
     const out = approvals[it.id] ?? [];
     if (!it.review) return { label: '바로 공개 자료', on: true };
-    return out.length ? { label: `배포됨 · ${out.map((c) => names[c] ?? c).join(', ')}`, on: true } : { label: '검수 대기', on: false };
+    return out.length ? { label: `배포됨 · ${out.map((c) => names[c] ?? c).join(', ')}`, on: true } : { label: '배포 전', on: false };
   };
   function listScreen() {
     const mineItems = items.filter((it) => it.review && it.targets.some((t) => mine.includes(t)));
@@ -154,7 +165,8 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
         ${mine.length ? `<p class="section-label">우리 공동체 나눔지</p>` : ''}
         <ul class="rows">${freshItems.map((id) => `<li class="item-card">
             <span class="txt"><strong>${esc(approvalTitles[id] ?? '새 나눔지')}</strong><span>배포됨 · ${(approvals[id] ?? []).map((c) => esc(names[c] ?? c)).join(', ')} · 1~2분 뒤 공동체 화면에 나타나요</span></span>
-            <div class="chips"><button type="button" class="chip pull" data-pull-fresh="${id}">거둬들이기</button></div></li>`).join('')}
+            <div class="chips"><button type="button" class="chip pull" data-pull-fresh="${id}">거둬들이기</button>
+              <button type="button" class="chip" data-del="${id.replace(/^shared__/, '')}" data-del-title="${esc(approvalTitles[id] ?? '')}">지우기</button></div></li>`).join('')}
           ${mineItems.map((it) => {
           const s = status(it);
           const pullable = (approvals[it.id] ?? []).some((c) => mine.includes(c));
@@ -164,7 +176,9 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
             </button>
             <div class="chips">
               <button type="button" class="chip" data-open="${it.id}">검토하기</button>
+              ${it.full ? `<button type="button" class="chip" data-edit-gbs="${it.id}">수정하기</button>` : ''}
               ${pullable ? `<button type="button" class="chip pull" data-pull="${it.id}">거둬들이기</button>` : `<button type="button" class="chip on" data-open="${it.id}">배포하기</button>`}
+              ${it.file ? `<button type="button" class="chip" data-del="${it.file}" data-del-title="${esc(it.title)}">지우기</button>` : ''}
             </div></li>`;
         }).join('') || (mine.length && !freshItems.length ? '<li class="empty">아직 나눔지가 없어요</li>' : '')}</ul>
         <ul class="menu">
@@ -182,6 +196,11 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
+    view.querySelectorAll<HTMLElement>('[data-edit-gbs]').forEach((b) => (b.onclick = () => {
+      const it = items.find((i) => i.id === b.dataset.editGbs)!;
+      editDraft({ gbs: { ...it.full! }, editFile: it.file, communities: it.targets }, 0);
+    }));
+    view.querySelectorAll<HTMLElement>('[data-del]').forEach((b) => (b.onclick = () => deleteScreen(b.dataset.del!, b.dataset.delTitle || '이 나눔지')));
     view.querySelectorAll<HTMLElement>('[data-pull-fresh]').forEach((b) => (b.onclick = () => {
       const id = b.dataset.pullFresh!;
       pullScreen({ id, title: approvalTitles[id] ?? '이 나눔지' } as Item);
@@ -543,7 +562,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   }
 
   // ── 설교 원고 올리기 — 원고만 넣으면 스밈(AI)이 나눔지를 만들어요 (원고는 저장하지 않아요)
-  type Sermon = { text?: string; fileName?: string; pdf?: string; communities?: string[]; note?: string; gbs?: MadeGbs; draftId?: string };
+  type Sermon = { text?: string; fileName?: string; pdf?: string; communities?: string[]; note?: string; gbs?: MadeGbs; draftId?: string; editFile?: string };
   const SERVICES = ['주일예배', '새벽예배', '수요예배', '금요기도회'];
   const today = () => { const d = new Date(Date.now() + 9 * 3600_000); return d.toISOString().slice(0, 10); };
   const SSTEPS = 4;
@@ -715,7 +734,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   function editDraft(d: Sermon, step: number) {
     const g = d.gbs!;
     const go = (n: number, patch: Partial<MadeGbs> = {}) => { const nd = { ...d, gbs: { ...g, ...patch } }; keepDraft(nd); editDraft(nd, n); };
-    const common = { title: '나눔지 검토', step: [step + 1, ESTEPS] as [number, number], back: step ? () => editDraft(d, step - 1) : listScreen };
+    const common = { title: d.editFile ? '나눔지 수정' : '나눔지 검토', step: [step + 1, ESTEPS] as [number, number], back: step ? () => editDraft(d, step - 1) : listScreen };
     const ta = (k: string, v: string, rows = 3, ph = '') => `<textarea class="memo field ed-ta" data-k="${k}" rows="${rows}" placeholder="${ph}">${esc(v ?? '')}</textarea>`;
     const inp = (k: string, v: string, ph = '', type = 'text') => `<input class="field" data-k="${k}" type="${type}" placeholder="${ph}" value="${esc(v ?? '')}" />`;
     const val = (k: string) => (view.querySelector<HTMLInputElement>(`[data-k="${k}"]`)?.value ?? '').trim();
@@ -781,7 +800,47 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
           songs: val('songs').split(',').map((x) => x.trim()).filter(Boolean),
         })] });
     }
-    if (step === 5) deployDraft(d);
+    if (step === 5) { if (d.editFile) saveEdited(d); else deployDraft(d); }
+  }
+
+  // 이미 올린 나눔지 고친 내용 저장
+  function saveEdited(d: Sermon) {
+    const g = d.gbs!;
+    frame({ title: '나눔지 수정', step: [6, ESTEPS], back: () => editDraft(d, 4),
+      body: `<h2 class="screen-title">고친 내용을 저장할까요?</h2>
+        <p class="lead">저장하면 1~2분 뒤 공동체 화면에 반영돼요. 배포 상태는 그대로예요.</p>
+        <div class="summary-card"><strong>${esc(g.title)}</strong><span>${esc(g.passage)} · ${esc(g.preacher)}</span></div>`,
+      primary: ['저장하기', () => busy(async () => {
+        try { await updateGbs(d.editFile!, g); } catch (e) { return failBtn(e, '저장하기'); }
+        const it = items.find((i) => i.file === d.editFile);
+        if (it) Object.assign(it, { title: g.title, passage: g.passage, preacher: g.preacher, full: g });
+        toast('저장했어요. 1~2분 뒤 반영돼요');
+        listScreen();
+      })] });
+  }
+  // 나눔지 지우기 — 확인 창
+  function deleteScreen(file: string, title: string) {
+    const dlg = document.createElement('div');
+    dlg.className = 'dialog-backdrop';
+    dlg.innerHTML = `<div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-d">
+        <h2 id="dlg-d">「${esc(title)}」 나눔지를<br />지울까요?</h2>
+        <p>공동체 화면과 목록에서 사라지고<br />되돌릴 수 없어요.</p>
+        <div class="dialog-actions"><button type="button" class="dlg-cancel">취소</button><button type="button" class="dlg-ok">지우기</button></div></div>`;
+    document.body.append(dlg);
+    requestAnimationFrame(() => dlg.classList.add('on'));
+    const close = () => { dlg.classList.remove('on'); setTimeout(() => dlg.remove(), 200); };
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
+    dlg.querySelector<HTMLButtonElement>('.dlg-cancel')!.onclick = close;
+    const ok = dlg.querySelector<HTMLButtonElement>('.dlg-ok')!;
+    ok.onclick = async () => {
+      ok.disabled = true; ok.textContent = '지우는 중…';
+      try { await deleteGbs(file); }
+      catch (e) { ok.disabled = false; ok.textContent = '지우기'; return toast(aiError(e, '지우지 못했어요. 다시 해 주세요.')); }
+      const id = `shared__${file}`;
+      delete approvals[id];
+      const i = items.findIndex((x) => x.file === file); if (i >= 0) items.splice(i, 1);
+      close(); toast('지웠어요. 1~2분 뒤 공동체 화면에서도 사라져요'); listScreen();
+    };
   }
 
   // 배포 — 공동체를 고르고 (없으면 이름만 적어 바로 만들고) 배포해요

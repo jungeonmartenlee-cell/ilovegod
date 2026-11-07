@@ -107,3 +107,13 @@ export async function saveCommunity(slug: string, edit: { name: string; tagline:
   const call = httpsCallable<object, { ok: boolean }>(fns, 'saveCommunity', { timeout: 60_000 });
   await call({ slug, edit });
 }
+/** 올린 나눔지 고치기 (file: 파일 이름 예 2026-11-07) */
+export async function updateGbs(file: string, gbs: MadeGbs) {
+  const call = httpsCallable<object, { ok: boolean }>(fns, 'updateGbs', { timeout: 60_000 });
+  await call({ slug: file, gbs });
+}
+/** 올린 나눔지 지우기 */
+export async function deleteGbs(file: string) {
+  const call = httpsCallable<object, { ok: boolean }>(fns, 'deleteGbs', { timeout: 60_000 });
+  await call({ slug: file });
+}

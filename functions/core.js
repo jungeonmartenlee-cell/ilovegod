@@ -166,3 +166,15 @@ export function romanize(name) {
 /** 주소로 쓸 수 없는 이름 (사이트의 다른 페이지와 겹쳐요) */
 export const RESERVED = new Set(['staff', 'guide', 'privacy', 'terms', 'gbs', 'qr', 'api', 'admin', 'index', 'images', 'pdfjs', 'favicon', '404', 'types', 'edits', 'about', 'share', 'login']);
 export const SLUG_RE = /^[a-z][a-z0-9-]{1,19}$/;
+/** 파일 지우기 */
+export async function deleteRepoFile(token, path, message, sha) {
+  const r = await gh(token, path, { method: 'DELETE', body: JSON.stringify({ message, sha, branch: BRANCH }) });
+  if (!r.ok) throw new Error(`github ${r.status}`);
+}
+/** 나눔지 파일(마크다운)의 머리말(--- 사이)을 읽어요 */
+export function readFront(md) {
+  const m = /^---\n([\s\S]*?)\n---/.exec(md);
+  return m ? parseYamlText(m[1]) : {};
+}
+import { parse as parseYamlText } from 'yaml';
+export const GBS_DIR = DIR;
