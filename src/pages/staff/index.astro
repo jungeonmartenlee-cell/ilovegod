@@ -23,7 +23,7 @@ const items = all.map((g) => {
 const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
 const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainName, tagline: c.tagline ?? '', intro: c.intro ?? '', worship: (c.worship ?? []).map((w) => ({ label: w.label, time: w.time, place: w.place })) }]));
 ---
-<BaseLayout title="교역자" bare intro={{ line1: '설교 원고에서', line2: '나눔지까지 1분', id: 'intro-staff' }}>
+<BaseLayout title="교역자" bare intro={{ lead: '1분', line1: '설교 원고에서 나눔지까지', line2: '', id: 'intro-staff' }}>
   <script type="application/json" id="staff-data" set:html={JSON.stringify({ items, names, info })} />
   <div class="staff">
     <header class="topbar">
