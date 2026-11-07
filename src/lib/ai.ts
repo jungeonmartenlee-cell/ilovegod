@@ -93,6 +93,6 @@ export async function makeGbs(text: string, communities: string[], note: string,
 
 export async function submitGbs(gbs: MadeGbs, communities: string[], draftId?: string): Promise<string> {
   if (BASE) return (await (await post('/submit', { gbs, communities })).json()).slug;
-  const call = httpsCallable<object, { slug: string }>(fns, 'submitGbs', { timeout: 60_000 });
+  const call = httpsCallable<object, { slug: string }>(fns, 'uploadGbs', { timeout: 60_000 });
   return (await call({ gbs, communities, draftId })).data.slug;
 }
