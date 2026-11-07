@@ -26,14 +26,15 @@ const OPTS = { region: 'asia-northeast3', cors: true, invoker: 'public' };
 const EXAMPLE = readFileSync(new URL('./example.yaml', import.meta.url), 'utf8');
 
 // ── 공통: 로그인한 교역자인지, 맡은 공동체인지 확인
-async function checkStaff(req, communities) {
+// allowNone: 아직 공동체가 없는 교역자도 나눔지 초안은 먼저 만들 수 있어요 (배포할 때 공동체가 필요해요)
+async function checkStaff(req, communities, allowNone = false) {
   const t = req.auth?.token;
   if (!t?.email || !t.email_verified) throw new HttpsError('unauthenticated', '교역자 계정으로 로그인해 주세요.');
   const snap = await db.doc(`staff/${t.email}`).get();
   if (!snap.exists) throw new HttpsError('permission-denied', '교역자로 등록된 계정이 아니에요.');
   const staff = snap.data();
-  if (!Array.isArray(communities) || !communities.length || communities.some((c) => typeof c !== 'string'))
-    throw new HttpsError('invalid-argument', '공동체를 골라 주세요.');
+  if (!Array.isArray(communities) || communities.some((c) => typeof c !== 'string')) throw new HttpsError('invalid-argument', '공동체를 골라 주세요.');
+  if (!communities.length && !allowNone) throw new HttpsError('invalid-argument', '배포할 공동체를 골라 주세요.');
   if (!staff.admin && !communities.every((c) => (staff.communities ?? []).includes(c)))
     throw new HttpsError('permission-denied', '맡은 공동체에만 만들 수 있어요.');
   return t.email;
@@ -62,7 +63,7 @@ async function mockGbs() {
 
 export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 540, memory: '512MiB' }, async (req) => {
   const { text, communities, note, pdf } = req.data ?? {};
-  const email = await checkStaff(req, communities);
+  const email = await checkStaff(req, communities, true);
   // 원고는 글자(text) 또는 PDF 파일(pdf, base64) 중 하나로 받아요
   const usePdf = typeof pdf === 'string' && pdf.length > 0;
   if (usePdf) {
@@ -111,10 +112,10 @@ export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSe
   }
 });
 
-// 7일 지난 내 초안은 지워요
+// 30일 지난 내 초안은 지워요
 async function cleanOldDrafts(email) {
   const old = await db.collection('drafts').where('by', '==', email).get();
-  const week = Date.now() - 7 * 86400_000;
+  const week = Date.now() - 30 * 86400_000;   // 30일 지난 초안
   await Promise.all(old.docs.filter((d) => (d.get('at')?.toMillis?.() ?? 0) < week).map((d) => d.ref.delete()));
 }
 
