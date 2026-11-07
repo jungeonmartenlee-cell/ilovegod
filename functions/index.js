@@ -21,7 +21,8 @@ const GH_TOKEN = defineSecret('GH_TOKEN');
 
 const DAILY_LIMIT = 10;              // 교역자 한 사람이 하루에 만들 수 있는 횟수
 const EMULATOR = process.env.FUNCTIONS_EMULATOR === 'true';
-const OPTS = { region: 'asia-northeast3', cors: true };
+// invoker: 'public' — 사이트에서 부를 수 있게 열어 둬요 (실제 사용 권한은 함수 안에서 교역자인지 확인해요)
+const OPTS = { region: 'asia-northeast3', cors: true, invoker: 'public' };
 const EXAMPLE = readFileSync(new URL('./example.yaml', import.meta.url), 'utf8');
 
 // ── 공통: 로그인한 교역자인지, 맡은 공동체인지 확인
