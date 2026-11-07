@@ -19,7 +19,7 @@ const db = getFirestore();
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 const GH_TOKEN = defineSecret('GH_TOKEN');
 
-const DAILY_LIMIT = 10;              // 교역자 한 사람이 하루에 만들 수 있는 횟수
+const DAILY_LIMIT = 3;               // 교역자 한 사람이 하루에 만들 수 있는 횟수
 const EMULATOR = process.env.FUNCTIONS_EMULATOR === 'true';
 // invoker: 'public' — 사이트에서 부를 수 있게 열어 둬요 (실제 사용 권한은 함수 안에서 교역자인지 확인해요)
 const OPTS = { region: 'asia-northeast3', cors: true, invoker: 'public' };
@@ -120,6 +120,18 @@ async function cleanOldDrafts(email) {
 
 // ── 확인한 나눔지를 사이트에 올리기
 export const submitGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+  try {
+    return await submit(req);
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    // 예상하지 못한 오류 — 원인을 화면과 기록에 남겨요 (원고나 나눔지 내용은 남기지 않아요)
+    const why = `${e?.name ?? 'Error'}: ${String(e?.message ?? '').slice(0, 120)}`;
+    console.error('submitGbs unexpected', why, e?.stack?.split('\n').slice(0, 4).join(' | '));
+    throw new HttpsError('unknown', `올리지 못했어요 (${why})`);
+  }
+});
+
+async function submit(req) {
   const { gbs, communities, draftId } = req.data ?? {};
   const email = await checkStaff(req, communities);
   const parsed = Submit.safeParse(gbs);
@@ -143,9 +155,9 @@ export const submitGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 
     return { slug };
   } catch (e) {
     console.error('submitGbs github', String(e?.message));
-    throw new HttpsError('unavailable', '사이트에 올리지 못했어요. 잠시 뒤에 다시 해 주세요.');
+    throw new HttpsError('unavailable', `사이트에 올리지 못했어요 (${String(e?.message ?? '').slice(0, 60)}). 잠시 뒤에 다시 해 주세요.`);
   }
-});
+}
 
 // 사이트에 올린 초안은 지워요 (본인 것만)
 async function removeDraft(id, email) {
