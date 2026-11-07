@@ -103,7 +103,7 @@ export async function createCommunity(name: string): Promise<{ slug: string; nam
   return (await call({ name })).data;
 }
 /** 공동체 소개 고치기 */
-export async function saveCommunity(slug: string, edit: { name: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] }) {
+export async function saveCommunity(slug: string, edit: { name: string; parents?: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] }) {
   const call = httpsCallable<object, { ok: boolean }>(fns, 'saveCommunity', { timeout: 60_000 });
   await call({ slug, edit });
 }

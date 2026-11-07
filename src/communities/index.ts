@@ -8,15 +8,17 @@ const files = {
   ...import.meta.glob<{ default: Community }>('./*.json', { eager: true }),
 };
 // 교역자 화면에서 '공동체 소개 고치기'로 고친 내용 — 원래 설정 위에 덮어써요
-type Edit = { name?: string; tagline?: string; intro?: string; worship?: Community['worship'] };
+type Edit = { name?: string; parents?: string; tagline?: string; intro?: string; worship?: Community['worship'] };
 const edits = Object.fromEntries(
   Object.entries(import.meta.glob<{ default: Edit }>('./edits/*.json', { eager: true }))
     .map(([path, mod]) => [path.replace(/^\.\/edits\//, '').replace(/\.json$/, ''), mod.default]),
 );
 const applyEdit = (c: Community, e?: Edit): Community => {
   if (!e) return c;
-  const names = [...c.names];
+  let names = [...c.names];
   if (e.name?.trim()) names[0] = e.name.trim();
+  // 이름 옆에 작게 붙는 이름들 (예: REMNANT ORYUN)
+  if (e.parents !== undefined) names = [names[0], ...e.parents.split(/\s+/).filter(Boolean)];
   return {
     ...c, names,
     tagline: e.tagline === undefined ? c.tagline : e.tagline.trim() || undefined,

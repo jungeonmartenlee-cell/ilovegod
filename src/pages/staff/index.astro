@@ -32,7 +32,7 @@ const items = all.map((g) => {
   };
 });
 const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
-const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainName, tagline: c.tagline ?? '', intro: c.intro ?? '', worship: (c.worship ?? []).map((w) => ({ label: w.label, time: w.time, place: w.place })) }]));
+const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainName, parents: c.parentNames ?? '', tagline: c.tagline ?? '', intro: c.intro ?? '', worship: (c.worship ?? []).map((w) => ({ label: w.label, time: w.time, place: w.place })) }]));
 ---
 <BaseLayout title="교역자" bare intro={{ lead: '1분', line1: '설교 원고에서 나눔지까지', line2: '', id: 'intro-staff' }}>
   <script type="application/json" id="staff-data" set:html={JSON.stringify({ items, names, info })} />
@@ -61,7 +61,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     practice: string; devotions: { day: string; ref: string; title: string; question: string }[];
     prayers: string[]; songs: string[]; file: string; full: MadeGbs | null;
   };
-  type Info = { name: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] };
+  type Info = { name: string; parents?: string; tagline: string; intro: string; worship: { label: string; time: string; place: string }[] };
   const { items, names, info } = JSON.parse(document.getElementById('staff-data')!.textContent!) as { items: Item[]; names: Record<string, string>; info: Record<string, Info> };
   const fresh = new Set<string>();     // 방금 만든 공동체 (사이트에 나타나기까지 1~2분)
   const view = document.querySelector<HTMLElement>('[data-view]')!;
@@ -477,6 +477,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     frame({ title: '공동체 소개 고치기', back: listScreen,
       body: `<h2 class="screen-title">${esc(c.name)}</h2><p class="lead">비워 둔 칸은 사이트에서 보이지 않아요.</p>
         <label class="ed"><span>공동체 이름</span><input class="field" data-k="name" maxlength="20" value="${esc(c.name)}" /></label>
+        <label class="ed"><span>이름 옆에 작게 붙는 이름 (띄어쓰기로 구분)</span><input class="field" data-k="parents" maxlength="60" placeholder="예: GIL REMNANT ORYUN" value="${esc(c.parents ?? '')}" /></label>
         <label class="ed"><span>한 줄 소개</span><input class="field" data-k="tagline" maxlength="60" placeholder="예: God Is Love" value="${esc(c.tagline)}" /></label>
         <label class="ed"><span>소개 글</span><textarea class="memo field" data-k="intro" maxlength="400" placeholder="공동체를 짧게 소개해 주세요">${esc(c.intro)}</textarea></label>
         <div class="ed"><span>예배·모임</span><div data-rows>${rows.map(row).join('')}</div>
@@ -490,7 +491,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
           time: r.querySelector<HTMLInputElement>('[data-w="time"]')!.value.trim(),
           place: r.querySelector<HTMLInputElement>('[data-w="place"]')!.value.trim(),
         })).filter((w) => w.label || w.time || w.place);
-        const edit = { name: v('name'), tagline: v('tagline'), intro: v('intro'), worship };
+        const edit = { name: v('name'), parents: v('parents'), tagline: v('tagline'), intro: v('intro'), worship };
         busy(async () => {
           try { await saveCommunity(slug, edit); }
           catch (e) { toast(aiError(e, '저장하지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '저장하기'; } return; }
