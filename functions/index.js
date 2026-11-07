@@ -11,7 +11,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import Anthropic from '@anthropic-ai/sdk';
-import { outputFormat, Submit, buildSystem, userContent, toMarkdown, commitGbs, readRepoFile, writeRepoFile, romanize, RESERVED, SLUG_RE } from './core.js';
+import { outputFormat, Submit, buildSystem, userContent, toMarkdown, commitGbs, readRepoFile, writeRepoFile, deleteRepoFile, readFront, GBS_DIR, romanize, RESERVED, SLUG_RE } from './core.js';
 import { z } from 'zod/v4';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -259,5 +259,54 @@ export const saveCommunity = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSecon
     console.error('saveCommunity github', String(err?.message));
     throw new HttpsError('unavailable', '저장하지 못했어요. 잠시 뒤에 다시 해 주세요.');
   }
+  return { ok: true };
+});
+
+// ── 올린 나눔지 고치기 · 지우기 — 그 나눔지를 받는 공동체의 교역자만 (운영자는 모두)
+async function ownGbs(req, slug) {
+  if (typeof slug !== 'string' || !/^\d{4}-\d{2}-\d{2}(-\d+)?$/.test(slug)) throw new HttpsError('invalid-argument', '나눔지를 확인해 주세요.');
+  const token = GH_TOKEN.value();
+  const mock = EMULATOR && token === 'mock';
+  const path = mock ? `${process.env.LOCAL_CONTENT_DIR ?? '/tmp/gbs-test'}/${slug}.md` : `${GBS_DIR}/${slug}.md`;
+  const file = mock ? (existsSync(path) ? { sha: 'mock', text: readFileSync(path, 'utf8') } : null) : await readRepoFile(token, path);
+  if (!file) throw new HttpsError('not-found', '이미 지워졌거나 없는 나눔지예요.');
+  const communities = readFront(file.text).communities ?? [];
+  const t = req.auth?.token;
+  if (!t?.email || !t.email_verified) throw new HttpsError('unauthenticated', '교역자 계정으로 로그인해 주세요.');
+  const staff = (await db.doc(`staff/${t.email}`).get()).data();
+  if (!staff) throw new HttpsError('permission-denied', '교역자로 등록된 계정이 아니에요.');
+  if (!staff.admin && !communities.some((c) => (staff.communities ?? []).includes(c)))
+    throw new HttpsError('permission-denied', '맡은 공동체의 나눔지만 고칠 수 있어요.');
+  return { token, path, file, communities, mock };
+}
+
+export const updateGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+  const { slug, gbs } = req.data ?? {};
+  const parsed = Submit.safeParse(gbs);
+  if (!parsed.success) throw new HttpsError('invalid-argument', '제목, 본문, 설교자, 날짜를 확인해 주세요.');
+  const { token, path, file, communities, mock } = await ownGbs(req, slug);
+  if (mock) { writeFileSync(path, toMarkdown(parsed.data, communities)); return { ok: true }; }
+  try {
+    await writeRepoFile(token, path, toMarkdown(parsed.data, communities), `나눔지 고침: ${parsed.data.title}`, file.sha);
+  } catch (e) {
+    console.error('updateGbs', String(e?.message));
+    throw new HttpsError('unavailable', '저장하지 못했어요. 잠시 뒤에 다시 해 주세요.');
+  }
+  return { ok: true };
+});
+
+export const deleteGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+  const { slug } = req.data ?? {};
+  const { token, path, file, mock } = await ownGbs(req, slug);
+  try {
+    if (mock) (await import('node:fs')).unlinkSync(path); else await deleteRepoFile(token, path, `나눔지 지움: ${slug}`, file.sha);
+  } catch (e) {
+    console.error('deleteGbs', String(e?.message));
+    throw new HttpsError('unavailable', '지우지 못했어요. 잠시 뒤에 다시 해 주세요.');
+  }
+  // 배포 기록도 함께 지워요
+  const id = `shared__${slug}`;
+  const ap = await db.collection('approvals').where('gbs', '==', id).get();
+  await Promise.all(ap.docs.map((d) => d.ref.delete()));
   return { ok: true };
 });
