@@ -149,6 +149,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
             </div></li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>
         <ul class="menu">
+          <li><button type="button" data-qr><span>QR 내려받기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
@@ -159,6 +160,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => newCommunity(0, {});
     view.querySelector<HTMLElement>('[data-requests]')!.onclick = requestsScreen;
+    view.querySelector<HTMLElement>('[data-qr]')!.onclick = qrScreen;
     bindDrafts();
     onList = true;
   }
@@ -217,6 +219,33 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     }
   }
   const canNotify = () => 'Notification' in window && Notification.permission === 'default';
+
+  // ── QR 내려받기 — 공동체 광고 시간에 PPT로 띄우거나 주보에 넣어요
+  function qrScreen() {
+    const site = (import.meta.env.SITE as string | undefined)?.replace(/\/$/, '') || location.origin;
+    const link = (c: string) => `${site}/${c}`;
+    const rows: [string, string, string | undefined][] = [
+      ['', '하나님을 사랑합니다', undefined],
+      ...mine.map((c) => [c, names[c] ?? c, (c.match(/[a-z0-9]/i)?.[0] ?? '').toUpperCase()] as [string, string, string]),
+    ];
+    frame({
+      title: 'QR 내려받기', back: listScreen,
+      body: `<h1 class="big-title">QR 내려받기</h1>
+        <p class="lead">QR 가운데에 공동체 첫 글자(예: GIL → G)가, 메인 QR에는 하트가 들어가요. 저장한 이미지 위에는 이름도 크게 들어가니 PPT나 주보에 그대로 넣어 주세요.</p>
+        <ul class="rows">${rows.map(([c, title], i) => `<li class="item-card">
+          <span class="txt"><strong>${esc(title)}</strong><span>${esc(link(c).replace(/^https?:\/\//, '').replace(/\/$/, ''))}${c ? '' : ' · 메인 화면'}</span></span>
+          <div class="chips"><button type="button" class="chip on" data-save-qr="${i}">QR 저장</button>
+            <button type="button" class="chip" data-copy-link="${c}">링크 복사</button></div></li>`).join('')}</ul>`,
+    });
+    view.querySelectorAll<HTMLElement>('[data-save-qr]').forEach((b) => (b.onclick = async () => {
+      const [c, title, label] = rows[Number(b.dataset.saveQr)];
+      const { saveQrPoster } = await import('../../lib/qr-art');
+      await saveQrPoster(link(c), title, label);
+    }));
+    view.querySelectorAll<HTMLElement>('[data-copy-link]').forEach((b) => (b.onclick = async () => {
+      try { await navigator.clipboard.writeText(link(b.dataset.copyLink!)); toast('링크를 복사했어요'); } catch { toast('복사가 안 되는 환경이에요'); }
+    }));
+  }
 
   // ── 공동체 개설 신청 — 한 화면에 질문 하나씩
   type Req = { name?: string; parents?: string; slug?: string; tagline?: string; worship?: string; pastor?: string; note?: string };
@@ -671,6 +700,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .item-card { padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); }
   .staff .item-open { width: 100%; padding: 0; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
   .staff .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+  .staff a.chip { text-decoration: none; }
   .staff button.chip { border: 0; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
   .staff .menu { display: grid; margin-top: 28px; border-radius: 22px; overflow: hidden; background: var(--card); border: 0.5px solid var(--line); }
   .staff .menu li + li { border-top: 0.5px solid var(--line); }
