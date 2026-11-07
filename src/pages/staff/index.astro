@@ -189,6 +189,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
         ${isAdmin ? `<div class="admin-zone">
           <p class="admin-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" /></svg>운영자 전용 · 운영자에게만 보여요</p>
           <ul class="menu admin">
+            <li><button type="button" data-edit-all><span>공동체 소개 관리</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
             <li><button type="button" data-staff-admin><span>교역자 관리${pendingStaff ? ` <b class="badge">${pendingStaff}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           </ul></div>` : ''}`,
       primary: ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })],
@@ -206,7 +207,8 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
       pullScreen({ id, title: approvalTitles[id] ?? '이 나눔지' } as Item);
     }));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => createScreen();
-    const ed = view.querySelector<HTMLElement>('[data-edit-community]'); if (ed) ed.onclick = chooseEdit;
+    const ed = view.querySelector<HTMLElement>('[data-edit-community]'); if (ed) ed.onclick = () => chooseEdit();
+    const ea = view.querySelector<HTMLElement>('[data-edit-all]'); if (ea) ea.onclick = () => chooseEdit(true);
     view.querySelector<HTMLElement>('[data-qr]')!.onclick = qrScreen;
     const sa = view.querySelector<HTMLElement>('[data-staff-admin]'); if (sa) sa.onclick = staffAdminScreen;
     const mq = view.querySelector<HTMLElement>('[data-mine-qr]'); if (mq) mq.onclick = () => qrPopup(mine);
@@ -457,10 +459,12 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   }
 
   // ── 공동체 소개 고치기
-  function chooseEdit() {
-    if (mine.length === 1) return editScreen(mine[0]);
-    frame({ title: '공동체 소개 고치기', back: listScreen, body: `<h2 class="screen-title">어느 공동체를 고칠까요?</h2>
-      <ul class="menu">${mine.map((c) => `<li><button type="button" data-c="${c}"><span>${esc(names[c] ?? c)}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>`).join('')}</ul>` });
+  // all: 운영자는 모든 공동체를 고칠 수 있어요
+  function chooseEdit(all = false) {
+    const list = all ? Object.keys(names) : mine;
+    if (list.length === 1) return editScreen(list[0]);
+    frame({ title: all ? '공동체 소개 관리' : '공동체 소개 고치기', back: listScreen, body: `<h2 class="screen-title">어느 공동체를 고칠까요?</h2>
+      <ul class="menu">${list.map((c) => `<li><button type="button" data-c="${c}"><span>${esc(names[c] ?? c)}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>`).join('')}</ul>` });
     view.querySelectorAll<HTMLElement>('[data-c]').forEach((b) => (b.onclick = () => editScreen(b.dataset.c!)));
   }
   function editScreen(slug: string) {
