@@ -144,8 +144,8 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
         <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')} <button type="button" class="inline-link" data-mine-qr>공동체 QR</button></p>` : `<h1 class="big-title">환영해요!<br />이렇게 시작해 보세요</h1>
         <ol class="start-steps">
           <li><b>1</b><span><strong>설교 원고로 나눔지 만들기</strong><small>원고만 올리면 스밈이 1분 안팎으로 만들어요</small></span></li>
-          <li><b>2</b><span><strong>배포할 공동체 만들기</strong><small>이름만 적으면 바로 만들어져요</small></span></li>
-          <li><b>3</b><span><strong>공동체에 배포하고 QR 전달</strong><small>만든 나눔지는 30일 동안 보관돼요</small></span></li>
+          <li><b>2</b><span><strong>검토하고 고치기</strong><small>요약·질문·묵상·기도를 한 화면씩 확인해요</small></span></li>
+          <li><b>3</b><span><strong>공동체에 배포하고 QR 전달</strong><small>공동체가 없으면 이름만 적어 바로 만들어요</small></span></li>
         </ol>`}
         ${draftsHtml()}
         <ul class="rows">${mineItems.map((it) => {
@@ -193,7 +193,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
       const t = d.gbs?.title ? esc(d.gbs.title) : '새 나눔지';
       if (d.status === 'ready') return `<li class="item-card draft ready"><button type="button" class="item-open" data-draft="${d.id}">
           <span class="txt"><strong>${t}</strong><span>${esc(d.gbs?.passage ?? '')} · 다 만들었어요</span></span></button>
-          <div class="chips"><button type="button" class="chip on" data-draft="${d.id}">${mine.length ? '확인하고 올리기' : '나눔지 보기'}</button><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
+          <div class="chips"><button type="button" class="chip on" data-draft="${d.id}">검토하고 배포하기</button><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
       if (d.status === 'failed' || stuck(d)) return `<li class="item-card draft"><span class="txt"><strong>만들지 못했어요</strong><span>${esc(d.error ?? '원고를 다시 올려 주세요.')}</span></span>
           <div class="chips"><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
       return `<li class="item-card draft"><span class="txt"><strong><span class="dot"></span>스밈이 만들고 있어요</strong><span>${ago(d)} 시작 · 다 되면 여기서 확인할 수 있어요</span></span></li>`;
@@ -419,7 +419,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
             const d = ready[0];
             if (!d?.gbs) return sermonStep(0, { communities: [r.slug] });
             const gbs = { ...d.gbs }; if (!gbs.date) gbs.date = today();
-            confirmSermon({ communities: [r.slug], gbs, draftId: d.id });
+            deployDraft({ communities: [r.slug], gbs, draftId: d.id });
           };
         });
       }] });
@@ -692,85 +692,137 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     }
   }
 
-  function pickForDraft(d: Sermon) {
-    frame({ title: '설교 원고 올리기', back: listScreen, body: `<h2 class="screen-title">어느 공동체에 올릴까요?</h2>
-        <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
-        <p class="field-error" hidden></p>`,
-      primary: ['다음', () => {
-        const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
-        if (!picked.length) return fieldError('공동체를 하나 이상 골라 주세요');
-        confirmSermon({ ...d, communities: picked });
-      }] });
+  // ── 만든 나눔지 검토·수정 → 배포 (한 화면에 하나씩)
+  //  1 설교 정보 · 2 요약 · 3 나눔 질문 · 4 5일 묵상 · 5 기도와 찬양 · 6 배포
+  const ESTEPS = 6;
+  function confirmSermon(d: Sermon) { editDraft(d, 0); }
+  async function keepDraft(d: Sermon) {
+    // 고친 내용을 초안에 저장해 두면, 나중에 다시 와도 이어서 할 수 있어요
+    if (!d.draftId || !d.gbs) return;
+    try { await updateDoc(doc(db, 'drafts', d.draftId), { gbs: d.gbs }); } catch (e) { console.warn('keepDraft', e); }
   }
-  // 공동체가 아직 없는 교역자: 완성된 나눔지 미리 보기 → 공동체 개설 안내
-  function previewDraft(d: Sermon) {
+  function editDraft(d: Sermon, step: number) {
     const g = d.gbs!;
-    const li = (xs: string[]) => xs.map((x) => `<li>${esc(x)}</li>`).join('');
-    frame({ title: '나눔지 미리 보기', back: listScreen,
-      body: `<div class="done-mark small"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
-        <h1 class="big-title center">나눔지가 완성됐어요</h1>
-        <p class="lead center">${esc(g.title)} · ${esc(g.passage)}${g.preacher ? ` · ${esc(g.preacher)}` : ''}</p>
-        <div class="pv">
-          <div class="preview-card col"><span class="sub">핵심 메시지</span><strong class="key">${esc(g.key)}</strong></div>
-          <h3>3줄 요약</h3><ol>${li(g.summary)}</ol>
-          <h3>나눔 질문</h3><ol>${g.share.questions.map((q) => `<li><b>${esc(q.tag)}</b> ${esc(q.text)}</li>`).join('')}</ol>
-          <h3>5일 묵상</h3><ol>${g.devotions.map((v) => `<li><b>${esc(v.ref)}</b> ${esc(v.title)}</li>`).join('')}</ol>
-          <h3>함께 드리는 기도</h3><ol>${li(g.prayers)}</ol>
-        </div>
-        <div class="note">이 나눔지를 성도들에게 보내려면 <b>배포할 공동체</b>가 필요해요. 공동체 이름만 적으면 바로 만들어지고, 첫 화면의 '스밈이 만든 나눔지'에서 올릴 수 있어요. (30일 동안 보관돼요)</div>`,
-      primary: ['배포할 공동체 만들기', () => createScreen()],
-      secondary: ['첫 화면으로', listScreen] });
-  }
+    const go = (n: number, patch: Partial<MadeGbs> = {}) => { const nd = { ...d, gbs: { ...g, ...patch } }; keepDraft(nd); editDraft(nd, n); };
+    const common = { title: '나눔지 검토', step: [step + 1, ESTEPS] as [number, number], back: step ? () => editDraft(d, step - 1) : listScreen };
+    const ta = (k: string, v: string, rows = 3, ph = '') => `<textarea class="memo field ed-ta" data-k="${k}" rows="${rows}" placeholder="${ph}">${esc(v ?? '')}</textarea>`;
+    const inp = (k: string, v: string, ph = '', type = 'text') => `<input class="field" data-k="${k}" type="${type}" placeholder="${ph}" value="${esc(v ?? '')}" />`;
+    const val = (k: string) => (view.querySelector<HTMLInputElement>(`[data-k="${k}"]`)?.value ?? '').trim();
+    const head = (t: string, sub: string) => `<p class="eyebrow">${esc(g.title)} · ${esc(g.passage)}</p><h2 class="screen-title">${t}</h2><p class="lead">${sub}</p>`;
 
-  // 나눔지에 적힌 설교 정보 확인 — 원고에서 못 찾은 칸만 채우면 돼요
-  function confirmSermon(d: Sermon) {
-    // 아직 공동체가 없으면: 만든 나눔지를 먼저 보여 주고, 공동체 개설로 안내해요
-    if (!mine.length) return previewDraft(d);
-    // 공동체 없이 만든 초안을 올릴 때: 배포할 공동체를 골라요
-    if (!d.communities?.length) {
-      if (mine.length === 1) d = { ...d, communities: [...mine] };
-      else return pickForDraft(d);
-    }
-    const g = d.gbs!;
-    const field = (key: 'title' | 'passage' | 'preacher' | 'date' | 'service', label: string, ph: string, type = 'text') =>
-      `<label class="kv-field"><span>${label}</span><input class="field" data-k="${key}" type="${type}" maxlength="${key === 'service' || key === 'preacher' ? 40 : 80}" placeholder="${ph}" value="${esc(g[key] ?? '')}" /></label>`;
-    frame({ title: '설교 원고 올리기', step: [4, SSTEPS], back: d.draftId && !d.text ? listScreen : () => sermonStep(2, d),
-      body: `<h2 class="screen-title">이렇게 적었어요. 맞나요?</h2>
-        <p class="lead">원고에서 찾은 내용이에요. 비어 있거나 틀린 칸만 고쳐 주세요.</p>
+    if (step === 0) {
+      frame({ ...common, body: head('설교 정보가 맞나요?', '원고에서 찾은 내용이에요. 비어 있거나 틀린 칸만 고쳐 주세요.') + `
         <div class="kv-fields">
-          ${field('title', '제목', '설교 제목')}
-          ${field('passage', '본문', '예: 창세기 22:4–14')}
-          ${field('preacher', '설교자', '예: 이준건 목사')}
-          ${field('date', '날짜', '', 'date')}
-          ${field('service', '예배', '없으면 비워 둬도 돼요')}
+          <label class="kv-field"><span>제목</span>${inp('title', g.title, '설교 제목')}</label>
+          <label class="kv-field"><span>본문</span>${inp('passage', g.passage, '예: 창세기 22:4–14')}</label>
+          <label class="kv-field"><span>설교자</span>${inp('preacher', g.preacher, '예: 이준건 목사')}</label>
+          <label class="kv-field"><span>날짜</span>${inp('date', g.date, '', 'date')}</label>
+          <label class="kv-field"><span>예배</span>${inp('service', g.service, '없으면 비워 둬도 돼요')}</label>
         </div>
         <ul class="svc-chips">${SERVICES.map((x) => `<li><button type="button" class="chip" data-svc="${x}">${x}</button></li>`).join('')}</ul>
-        <div class="preview-card col"><span class="sub">핵심 메시지</span><strong class="key">${esc(g.key)}</strong></div>
-        <p class="field-error" hidden></p>
-        <p class="lead small">올리면 검수 목록에 나타나요. 나눔지 내용은 거기서 한 단계씩 확인해 주세요.</p>`,
-      primary: ['검수 목록에 올리기', () => {
-        const v: any = {};
-        view.querySelectorAll<HTMLInputElement>('[data-k]').forEach((i) => (v[i.dataset.k!] = i.value.trim()));
-        if (!v.title) return fieldError('제목을 적어 주세요');
-        if (!v.passage) return fieldError('본문을 적어 주세요');
-        if (!v.preacher) return fieldError('원고에 설교자가 없어요. 설교자를 적어 주세요');
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return fieldError('날짜를 골라 주세요');
-        const gbs = { ...g, ...v };
-        busy(async () => {
-          try {
-            await submitGbs(gbs, d.communities!, d.draftId);
-          } catch (e) { toast(aiError(e, '올리지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '검수 목록에 올리기'; } return; }
-          frame({
-            body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
-              <h1 class="big-title center">검수 목록에 올렸어요</h1>
-              <p class="lead center">${esc(gbs.title)} · ${esc(gbs.passage)}<br />사이트에 반영되기까지 3분쯤 걸려요.<br />그다음 이 화면을 새로 고치면 검수 목록에 나타나요.</p>`,
-            primary: ['새로 고치기', () => location.reload()], secondary: ['목록으로', listScreen],
+        <p class="field-error" hidden></p>`,
+        primary: ['다음', () => {
+          const v = { title: val('title'), passage: val('passage'), preacher: val('preacher'), date: val('date'), service: val('service') };
+          if (!v.title) return fieldError('제목을 적어 주세요');
+          if (!v.passage) return fieldError('본문을 적어 주세요');
+          if (!v.preacher) return fieldError('원고에 설교자가 없어요. 설교자를 적어 주세요');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return fieldError('날짜를 골라 주세요');
+          go(1, v);
+        }] });
+      view.querySelectorAll<HTMLElement>('[data-svc]').forEach((b) => (b.onclick = () => (view.querySelector<HTMLInputElement>('[data-k="service"]')!.value = b.dataset.svc!)));
+    }
+    if (step === 1) {
+      frame({ ...common, body: head('설교 요약이 맞나요?', '고칠 곳이 있으면 바로 고쳐 주세요.') + `
+        <label class="ed"><span>핵심 메시지</span>${ta('key', g.key, 2)}</label>
+        ${g.summary.map((x, i) => `<label class="ed"><span>요약 ${i + 1}</span>${ta(`s${i}`, x, 3)}</label>`).join('')}
+        <p class="field-error" hidden></p>`,
+        primary: ['다음', () => {
+          const summary = g.summary.map((_, i) => val(`s${i}`)).filter(Boolean);
+          if (!val('key') || !summary.length) return fieldError('핵심 메시지와 요약을 채워 주세요');
+          go(2, { key: val('key'), summary });
+        }] });
+    }
+    if (step === 2) {
+      const qs = g.share.questions;
+      frame({ ...common, body: head(`나눔 질문 ${qs.length}개`, '소그룹 나눔방에서도 이 질문을 그대로 써요.') + `
+        ${qs.map((q, i) => `<div class="ed q-ed"><input class="field tag" data-k="t${i}" maxlength="20" value="${esc(q.tag)}" />${ta(`q${i}`, q.text, 4)}</div>`).join('')}
+        <label class="ed"><span>이번 주 실천</span>${ta('practice', g.share.practice, 2)}</label>
+        <p class="field-error" hidden></p>`,
+        primary: ['다음', () => {
+          const questions = qs.map((q, i) => ({ tag: val(`t${i}`) || q.tag, text: val(`q${i}`) })).filter((q) => q.text);
+          if (!questions.length) return fieldError('나눔 질문을 하나 이상 남겨 주세요');
+          go(3, { share: { ...g.share, questions, practice: val('practice') } });
+        }] });
+    }
+    if (step === 3) {
+      frame({ ...common, body: head(`${g.devotions.length}일 묵상`, '설교 다음 날부터 하루에 하나씩 묵상해요.') + `
+        ${g.devotions.map((v, i) => `<div class="ed dv-ed"><span>${i + 1}일째</span>
+          <div class="dv-top"><input class="field" data-k="r${i}" value="${esc(v.ref)}" placeholder="본문" /><input class="field" data-k="h${i}" value="${esc(v.title)}" placeholder="제목" /></div>
+          ${ta(`b${i}`, v.body, 4, '묵상 글')}${ta(`x${i}`, v.question, 2, '오늘의 질문')}</div>`).join('')}`,
+        primary: ['다음', () => go(4, { devotions: g.devotions.map((v, i) => ({ ref: val(`r${i}`), title: val(`h${i}`), body: val(`b${i}`), question: val(`x${i}`) })) })] });
+    }
+    if (step === 4) {
+      frame({ ...common, body: head('기도와 적용 찬양', '함께 드리는 기도예요.') + `
+        ${g.prayers.map((x, i) => `<label class="ed"><span>기도 ${i + 1}</span>${ta(`p${i}`, x, 2)}</label>`).join('')}
+        <label class="ed"><span>적용 찬양 (쉼표로 구분, 없으면 비워 두세요)</span>${inp('songs', g.songs.join(', '), '예: 주 하나님 지으신 모든 세계')}</label>`,
+        primary: ['다음', () => go(5, {
+          prayers: g.prayers.map((_, i) => val(`p${i}`)).filter(Boolean),
+          songs: val('songs').split(',').map((x) => x.trim()).filter(Boolean),
+        })] });
+    }
+    if (step === 5) deployDraft(d);
+  }
+
+  // 배포 — 공동체를 고르고 (없으면 이름만 적어 바로 만들고) 배포해요
+  function deployDraft(d: Sermon) {
+    const g = d.gbs!;
+    const back = () => editDraft(d, 4);
+    const common = { title: '나눔지 배포', step: [6, ESTEPS] as [number, number], back };
+    if (!mine.length) {
+      frame({ ...common, body: `<h2 class="screen-title">어느 공동체에 배포할까요?</h2>
+          <p class="lead">아직 공동체가 없어요. 공동체 이름만 적으면 바로 만들고 배포해요. 소개는 나중에 고칠 수 있어요.</p>
+          <input class="field one" maxlength="20" placeholder="예: 하손내빚" /><p class="field-error" hidden></p>`,
+        primary: ['공동체 만들고 배포하기', () => {
+          const name = view.querySelector<HTMLInputElement>('.field')!.value.trim().replace(/\s+/g, ' ');
+          if (!name) return fieldError('공동체 이름을 적어 주세요');
+          busy(async () => {
+            let r: { slug: string; name: string };
+            try { r = await createCommunity(name); }
+            catch (e) { return failBtn(e, '공동체 만들고 배포하기'); }
+            mine = [...mine, r.slug]; names[r.slug] = r.name; info[r.slug] = { name: r.name, tagline: '', intro: '', worship: [] };
+            await publish(d, [r.slug], '공동체 만들고 배포하기');
           });
-        });
-      }] });
-    view.querySelectorAll<HTMLElement>('[data-svc]').forEach((b) => (b.onclick = () => {
-      view.querySelector<HTMLInputElement>('[data-k="service"]')!.value = b.dataset.svc!;
-    }));
+        }] });
+      return;
+    }
+    const picked = d.communities?.length ? d.communities.filter((c) => mine.includes(c)) : mine.length === 1 ? [...mine] : [];
+    frame({ ...common, body: `<h2 class="screen-title">어느 공동체에 배포할까요?</h2>
+        <p class="lead">배포하면 1~2분 뒤 공동체 화면에 나타나요. 언제든 거둬들일 수 있어요.</p>
+        <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" ${picked.includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
+        <div class="summary-card"><strong>${esc(g.title)}</strong><span>${esc(g.passage)} · ${esc(g.preacher)}</span></div>
+        <p class="field-error" hidden></p>`,
+      primary: ['배포하기', () => {
+        const cs = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
+        if (!cs.length) return fieldError('공동체를 하나 이상 골라 주세요');
+        busy(() => publish(d, cs, '배포하기'));
+      }],
+      secondary: ['새 공동체 만들기', () => createScreen(() => deployDraft(d))] });
+  }
+  function failBtn(e: unknown, label: string) {
+    toast(aiError(e, '처리하지 못했어요. 다시 해 주세요.'));
+    const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = label; }
+  }
+  // 사이트에 올리고 → 고른 공동체에 바로 배포(승인) 표시
+  async function publish(d: Sermon, cs: string[], label: string) {
+    const g = d.gbs!;
+    let slug: string;
+    try { slug = await submitGbs(g, cs, d.draftId); } catch (e) { return failBtn(e, label); }
+    const id = `shared__${slug}`;
+    try {
+      for (const c of cs) await setDoc(doc(db, 'approvals', `${id}~${c}`), { gbs: id, community: c, title: g.title, by: user!.email, at: serverTimestamp() });
+      approvals[id] = cs;
+    } catch (e) { console.warn('approve', e); toast('사이트에 올렸어요. 배포 표시는 검수 목록에서 다시 해 주세요'); }
+    doneScreen({ id, slug, title: g.title, passage: g.passage } as Item, cs, true);
   }
 
   // ── 3. 검수 단계 (한 화면에 하나씩)
@@ -839,12 +891,12 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
       })],
     });
   }
-  function doneScreen(it: Item, picked: string[]) {
+  function doneScreen(it: Item, picked: string[], fresh = false) {
     const c = picked[0];
     frame({
       body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
         <h1 class="big-title center">${picked.map((x) => esc(names[x] ?? x)).join(', ')}에<br />배포했어요</h1>
-        <p class="lead center">${esc(it.title)} · ${esc(it.passage)}</p>
+        <p class="lead center">${esc(it.title)} · ${esc(it.passage)}${fresh ? '<br />1~2분 뒤 공동체 화면에 나타나요.' : ''}</p>
         <div class="share-qr-row"><button type="button" class="qr-cta" data-done-qr>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" /></svg>
           <span><strong>공동체 QR 받기</strong><small>QR을 저장해 공동체에 전달해 주세요</small></span></button></div>`,
@@ -985,6 +1037,12 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   .staff .w-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
   .staff .w-row [data-w="place"] { grid-column: 1 / -1; }
   .staff .add-row { justify-self: start; border: 0; background: none; font: inherit; font-weight: 700; color: var(--accent); padding: 4px; cursor: pointer; }
+  .staff .ed-ta { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 12px 14px; border-radius: 14px; border: 0.5px solid var(--line); font: inherit; font-size: .95rem; line-height: 1.6; min-height: 0; color: var(--text); outline: none; resize: vertical; }
+  .staff .ed-ta:focus, .staff .ed .field:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .staff .q-ed, .staff .dv-ed { padding: 14px; border-radius: 18px; background: var(--card); border: 0.5px solid var(--line); }
+  .staff .q-ed .tag { width: fit-content; min-width: 7em; max-width: 60%; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; border: 0; }
+  .staff .q-ed .field, .staff .dv-ed .field { background: var(--bg); }
+  .staff .dv-top { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
   .staff .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: .72rem; font-weight: 800; vertical-align: 2px; }
   .staff .section-label { margin: 22px 4px 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
   .staff .item-card.draft .txt { display: grid; gap: 2px; padding: 4px 0; }
