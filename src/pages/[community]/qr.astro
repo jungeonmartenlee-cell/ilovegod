@@ -1,0 +1,109 @@
+---
+// 공동체 QR — 예배 후 대형 화면에 띄우는 페이지 (주소: /공동체/qr)
+// 휴대폰 카메라로 비추면 공동체 첫 화면으로 들어와요.
+import QRCode from 'qrcode';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { BRAND } from '../../config';
+import { communities, type CommunityEntry } from '../../communities';
+
+export function getStaticPaths() {
+  return communities.map((c) => ({ params: { community: c.slug }, props: { community: c } }));
+}
+const { community } = Astro.props as { community: CommunityEntry };
+const url = new URL(`/${community.slug}`, Astro.site).href;
+const shortUrl = url.replace(/^https?:\/\//, '');
+const svg = await QRCode.toString(url, { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } });
+---
+<BaseLayout community={community} title="QR" bare hideHeader>
+  <meta slot="head" name="robots" content="noindex" />
+  <div class="stage" data-stage data-url={url} data-name={community.mainName}>
+    <div class="qr-card"><div class="qr" set:html={svg} /></div>
+    <div class="words">
+      <p class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z" /></svg>{BRAND}</p>
+      <h1>{community.mainName}</h1>
+      {community.tagline && <p class="tagline">{community.tagline}</p>}
+      <p class="how">휴대폰 카메라로 <br />QR을 비춰 주세요</p>
+      <p class="url">{shortUrl}</p>
+    </div>
+  </div>
+  <div class="tools" data-tools>
+    <button type="button" data-full>전체 화면</button>
+    <button type="button" data-save>이미지 저장</button>
+    <a href={`/${community.slug}`}>나가기</a>
+  </div>
+</BaseLayout>
+
+<script>
+  import QRCode from 'qrcode';
+  const stage = document.querySelector<HTMLElement>('[data-stage]')!;
+  const tools = document.querySelector<HTMLElement>('[data-tools]')!;
+  const { url, name } = stage.dataset as { url: string; name: string };
+
+  // 전체 화면 (발표 화면에서 F 키로도)
+  const full = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())?.catch?.(() => {});
+  document.querySelector<HTMLElement>('[data-full]')!.onclick = full;
+  addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') full(); });
+
+  // 마우스를 움직이지 않으면 아래 버튼을 숨겨요
+  let t: number;
+  const wake = () => { tools.classList.remove('hide'); clearTimeout(t); t = window.setTimeout(() => tools.classList.add('hide'), 2500); };
+  ['mousemove', 'touchstart', 'keydown'].forEach((ev) => addEventListener(ev, wake, { passive: true }));
+  wake();
+
+  // 주보·PPT용 이미지 저장 (흰 바탕, 2000×2400)
+  document.querySelector<HTMLElement>('[data-save]')!.onclick = async () => {
+    const W = 2000, H = 2220, Q = 1500;
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+    const qr = document.createElement('canvas');
+    await QRCode.toCanvas(qr, url, { width: Q, margin: 0, errorCorrectionLevel: 'M', color: { dark: '#111111', light: '#ffffff' } });
+    g.drawImage(qr, (W - Q) / 2, 330);
+    const font = getComputedStyle(document.body).fontFamily;
+    g.fillStyle = '#111111'; g.textAlign = 'center';
+    g.font = `800 150px ${font}`; g.fillText(name, W / 2, 230);
+    g.fillStyle = '#6e6e73'; g.font = `600 70px ${font}`; g.fillText('휴대폰 카메라로 QR을 비춰 주세요', W / 2, 330 + Q + 150);
+    g.font = `500 56px ${font}`; g.fillText(url.replace(/^https?:\/\//, ''), W / 2, 330 + Q + 250);
+    const a = document.createElement('a');
+    a.download = `${name}-QR.png`; a.href = c.toDataURL('image/png'); a.click();
+  };
+</script>
+
+<style>
+  /* 화면 모드와 상관없이 밝은 바탕 — 카메라가 QR을 잘 읽도록 */
+  :global(body) { background: #f5f5f7 !important; color: #111 !important; }
+  :global(body.bare main) { padding: 0; }
+  :global(body.bare main .container) { max-width: none; padding: 0; }
+  .stage {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center; gap: clamp(28px, 6vw, 110px);
+    padding: clamp(20px, 4vw, 64px); box-sizing: border-box;
+  }
+  .qr-card { flex: none; padding: clamp(16px, 2.6vmin, 40px); background: #fff; border-radius: clamp(20px, 3vmin, 44px); box-shadow: 0 20px 60px rgba(0, 0, 0, .08); }
+  .qr { width: min(76vh, 46vw); height: min(76vh, 46vw); }
+  .qr :global(svg) { width: 100%; height: 100%; display: block; }
+  .words { display: grid; gap: clamp(8px, 1.6vmin, 22px); max-width: 40vw; }
+  .brand { display: flex; align-items: center; gap: .5em; margin: 0; font-size: clamp(16px, 2.4vmin, 30px); font-weight: 700; color: #6e6e73; }
+  .brand svg { width: 1.2em; height: 1.2em; fill: #f37021; }
+  h1 { margin: 0; font-size: clamp(48px, 11vmin, 150px); font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .tagline { margin: 0; font-size: clamp(18px, 3vmin, 40px); font-weight: 600; color: #f37021; }
+  .how { margin: clamp(10px, 3vmin, 40px) 0 0; font-size: clamp(22px, 4.4vmin, 58px); font-weight: 700; line-height: 1.3; letter-spacing: -.02em; }
+  .url { margin: 0; font-size: clamp(14px, 2.2vmin, 28px); color: #86868b; }
+
+  /* 세로 화면(휴대폰) */
+  @media (orientation: portrait) {
+    .stage { flex-direction: column-reverse; gap: 28px; text-align: center; }
+    .words { max-width: none; justify-items: center; }
+    .qr { width: min(78vw, 56vh); height: min(78vw, 56vh); }
+    .how br { display: none; }
+    .stage { padding-top: 64px; }
+    .tools { top: 14px; bottom: auto; right: 50%; transform: translateX(50%); }
+  }
+
+  .tools { position: fixed; right: 20px; bottom: 20px; display: flex; gap: 8px; transition: opacity .4s; }
+  .tools.hide { opacity: 0; pointer-events: none; }
+  .tools button, .tools a {
+    padding: 10px 16px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, .06);
+    font: inherit; font-size: .9rem; font-weight: 600; color: #333; text-decoration: none; cursor: pointer;
+  }
+</style>

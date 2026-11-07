@@ -149,6 +149,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
             </div></li>`;
         }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>
         <ul class="menu">
+          <li><button type="button" data-qr><span>공동체 QR 띄우기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
@@ -159,6 +160,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => newCommunity(0, {});
     view.querySelector<HTMLElement>('[data-requests]')!.onclick = requestsScreen;
+    view.querySelector<HTMLElement>('[data-qr]')!.onclick = qrScreen;
     bindDrafts();
     onList = true;
   }
@@ -217,6 +219,24 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     }
   }
   const canNotify = () => 'Notification' in window && Notification.permission === 'default';
+
+  // ── 공동체 QR — 예배 후 대형 화면에 띄우거나, 링크를 단톡방에 보내요
+  function qrScreen() {
+    const link = (c: string) => `${location.origin}/${c}`;
+    frame({
+      title: '공동체 QR', back: listScreen,
+      body: `<h1 class="big-title">공동체 QR</h1>
+        <p class="lead">예배 후 대형 화면에 띄우면 성도들이 휴대폰 카메라로 바로 들어와요.</p>
+        <ul class="rows">${mine.map((c) => `<li class="item-card">
+          <span class="txt"><strong>${esc(names[c] ?? c)}</strong><span>${esc(link(c).replace(/^https?:\/\//, ''))}</span></span>
+          <div class="chips"><a class="chip on" href="/${c}/qr" target="_blank" rel="noopener">QR 띄우기</a>
+            <button type="button" class="chip" data-copy-link="${c}">링크 복사</button></div></li>`).join('')}</ul>
+        <p class="lead small">QR 화면에서 <b>전체 화면</b>(또는 F 키)을 누르면 크게 보여요. <b>이미지 저장</b>으로 주보나 PPT에 넣을 수도 있어요.</p>`,
+    });
+    view.querySelectorAll<HTMLElement>('[data-copy-link]').forEach((b) => (b.onclick = async () => {
+      try { await navigator.clipboard.writeText(link(b.dataset.copyLink!)); toast('링크를 복사했어요'); } catch { toast('복사가 안 되는 환경이에요'); }
+    }));
+  }
 
   // ── 공동체 개설 신청 — 한 화면에 질문 하나씩
   type Req = { name?: string; parents?: string; slug?: string; tagline?: string; worship?: string; pastor?: string; note?: string };
@@ -671,6 +691,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .item-card { padding: 18px; border-radius: 22px; background: var(--card); border: 0.5px solid var(--line); }
   .staff .item-open { width: 100%; padding: 0; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
   .staff .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+  .staff a.chip { text-decoration: none; }
   .staff button.chip { border: 0; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; }
   .staff .menu { display: grid; margin-top: 28px; border-radius: 22px; overflow: hidden; background: var(--card); border: 0.5px solid var(--line); }
   .staff .menu li + li { border-top: 0.5px solid var(--line); }
