@@ -1,7 +1,7 @@
 // 교역자가 올린 설교 원고로 AI '스밈'이 GBS 나눔지를 만들어 주는 서버 함수
 //
 //  makeGbs   : 원고 → 나눔지 내용(JSON). 원고는 어디에도 저장하지 않고, 기록(로그)에도 남기지 않아요.
-//  submitGbs : 교역자가 확인한 나눔지를 GitHub에 올려요 → 사이트가 자동으로 다시 만들어지고 검수 목록에 나타나요.
+//  uploadGbs : 교역자가 확인한 나눔지를 GitHub에 올려요 → 사이트가 자동으로 다시 만들어지고 검수 목록에 나타나요.
 //
 //  필요한 비밀값 (Google Cloud → 보안 비밀 관리자에 등록)
 //    ANTHROPIC_API_KEY : 스밈이 쓰는 AI(Anthropic) API 키
@@ -119,14 +119,14 @@ async function cleanOldDrafts(email) {
 }
 
 // ── 확인한 나눔지를 사이트에 올리기
-export const submitGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+export const uploadGbs = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
   try {
     return await submit(req);
   } catch (e) {
     if (e instanceof HttpsError) throw e;
     // 예상하지 못한 오류 — 원인을 화면과 기록에 남겨요 (원고나 나눔지 내용은 남기지 않아요)
     const why = `${e?.name ?? 'Error'}: ${String(e?.message ?? '').slice(0, 120)}`;
-    console.error('submitGbs unexpected', why, e?.stack?.split('\n').slice(0, 4).join(' | '));
+    console.error('uploadGbs unexpected', why, e?.stack?.split('\n').slice(0, 4).join(' | '));
     throw new HttpsError('unknown', `올리지 못했어요 (${why})`);
   }
 });
@@ -154,7 +154,7 @@ async function submit(req) {
     await removeDraft(draftId, email);
     return { slug };
   } catch (e) {
-    console.error('submitGbs github', String(e?.message));
+    console.error('uploadGbs github', String(e?.message));
     throw new HttpsError('unavailable', `사이트에 올리지 못했어요 (${String(e?.message ?? '').slice(0, 60)}). 잠시 뒤에 다시 해 주세요.`);
   }
 }
