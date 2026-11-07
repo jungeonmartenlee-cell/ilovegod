@@ -390,7 +390,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   function createScreen(after: () => void = listScreen) {
     frame({ title: '새 공동체 만들기', back: after,
       body: `<h2 class="screen-title">공동체 이름을 적어 주세요</h2>
-        <p class="lead">이름만 적으면 바로 만들어져요. 사이트 주소(영어 이름)는 스밈이 정하고, 소개와 예배 시간은 나중에 언제든 고칠 수 있어요.</p>
+        <p class="lead">이름만 적으면 바로 만들어져요. 소개와 예배 시간은 나중에 언제든 고칠 수 있어요.</p>
         <input class="field one" maxlength="20" placeholder="예: 하손내빚" /><p class="field-error" hidden></p>`,
       primary: ['만들기', () => {
         const name = view.querySelector<HTMLInputElement>('.field')!.value.trim().replace(/\s+/g, ' ');
@@ -400,17 +400,27 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
           try { r = await createCommunity(name); }
           catch (e) { toast(aiError(e, '만들지 못했어요. 다시 해 주세요.')); const b = cta.querySelector<HTMLButtonElement>('.btn'); if (b) { b.disabled = false; b.textContent = '만들기'; } return; }
           if (!mine.includes(r.slug)) mine = [...mine, r.slug];
+          const ready = drafts.filter((x) => x.status === 'ready' && x.gbs);
           names[r.slug] = r.name; info[r.slug] = { name: r.name, tagline: '', intro: '', worship: [] }; fresh.add(r.slug);
           frame({
             body: `<div class="done-mark"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
               <h1 class="big-title center">「${esc(r.name)}」<br />공동체를 만들었어요</h1>
-              <p class="lead center">주소: ${esc(`${SITE}/${r.slug}`.replace(/^https?:\/\//, ''))}<br />1~2분 뒤 사이트에 나타나요.</p>
-              <div class="share-qr-row"><button type="button" class="qr-cta" data-edit-new>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>
+              <p class="lead center">1~2분 뒤 사이트에 나타나요.</p>
+              <div class="share-qr-row"><button type="button" class="qr-cta" data-deploy-new>
+                <svg class="line" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+                <span><strong>${ready.length ? '나눔지 배포하기' : '나눔지 만들기'}</strong><small>${ready.length ? `만든 나눔지 「${esc(ready[0].gbs?.title ?? '')}」${eul(ready[0].gbs?.title ?? '').slice((ready[0].gbs?.title ?? '').length)} 이 공동체에 올려요` : '설교 원고만 올리면 1분이면 돼요'}</small></span></button></div>
+              <div class="share-qr-row tight"><button type="button" class="qr-cta" data-edit-new>
+                <svg class="line" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" /></svg>
                 <span><strong>공동체 소개 채우기</strong><small>한 줄 소개, 예배 시간·장소를 적어 주세요</small></span></button></div>`,
-            primary: drafts.some((x) => x.status === 'ready') ? ['만든 나눔지 올리러 가기', listScreen] : ['첫 화면으로', listScreen],
+            primary: ['첫 화면으로', listScreen],
           });
           view.querySelector<HTMLElement>('[data-edit-new]')!.onclick = () => editScreen(r.slug);
+          view.querySelector<HTMLElement>('[data-deploy-new]')!.onclick = () => {
+            const d = ready[0];
+            if (!d?.gbs) return sermonStep(0, { communities: [r.slug] });
+            const gbs = { ...d.gbs }; if (!gbs.date) gbs.date = today();
+            confirmSermon({ communities: [r.slug], gbs, draftId: d.id });
+          };
         });
       }] });
     view.querySelector<HTMLInputElement>('.field')!.focus();
@@ -945,8 +955,10 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   .staff a.inline-link { text-decoration: none; display: inline-block; padding: 6px 14px; }
   .staff .inline-link { margin-left: 6px; padding: 2px 10px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; vertical-align: 1px; }
   .staff .share-qr-row { display: flex; justify-content: center; margin-top: 22px; }
+  .staff .share-qr-row.tight { margin-top: 10px; }
   .staff .qr-cta { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border: 0.5px solid var(--line); border-radius: 20px; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
   .staff .qr-cta svg { width: 34px; height: 34px; flex: none; fill: var(--accent); }
+  .staff .qr-cta svg.line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; width: 28px; height: 28px; margin: 0 3px; }
   .staff .qr-cta span { display: grid; gap: 2px; }
   .staff .qr-cta small { font-size: .82rem; color: var(--muted); }
   .staff .admin-zone { margin-top: 40px; padding-top: 22px; border-top: 1px dashed var(--line); }
