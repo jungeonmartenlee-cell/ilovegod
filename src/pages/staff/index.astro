@@ -74,6 +74,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   let back: (() => void) | null = null;
   let onList = false;                 // 첫 화면(목록)을 보고 있는지
   let registered = false;            // staff 문서가 있는지 (승인된 교역자)
+  let approvalTitles: Record<string, string> = {};   // 배포 기록의 나눔지 제목
   let pendingStaff = 0;               // 운영자: 기다리는 교역자 등록 신청 수
 
   let onMaking = false;               // '만들고 있어요' 화면을 보고 있는지
@@ -136,11 +137,13 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   };
   function listScreen() {
     const mineItems = items.filter((it) => it.review && it.targets.some((t) => mine.includes(t)));
+    // 방금 배포해서 아직 사이트에 반영되지 않은 나눔지 (1~2분)
+    const freshItems = Object.keys(approvals).filter((id) => !items.some((it) => it.id === id) && (approvals[id] ?? []).some((c) => mine.includes(c)));
     const waiting = mineItems.filter((it) => !(approvals[it.id] ?? []).length).length;
     frame({
       title: '',
       body: `<p class="eyebrow">${esc(user!.email!)}</p>
-        ${mine.length ? `<h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
+        ${mine.length ? `<h1 class="big-title">${waiting ? `배포 전 나눔지가<br />${waiting}개 있어요` : '모두 배포했어요'}</h1>
         <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')} <button type="button" class="inline-link" data-mine-qr>공동체 QR</button></p>` : `<h1 class="big-title">환영해요!<br />이렇게 시작해 보세요</h1>
         <ol class="start-steps">
           <li><b>1</b><span><strong>설교 원고로 나눔지 만들기</strong><small>원고만 올리면 스밈이 1분 안팎으로 만들어요</small></span></li>
@@ -148,18 +151,22 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
           <li><b>3</b><span><strong>공동체에 배포하고 QR 전달</strong><small>공동체가 없으면 이름만 적어 바로 만들어요</small></span></li>
         </ol>`}
         ${draftsHtml()}
-        <ul class="rows">${mineItems.map((it) => {
+        ${mine.length ? `<p class="section-label">우리 공동체 나눔지</p>` : ''}
+        <ul class="rows">${freshItems.map((id) => `<li class="item-card">
+            <span class="txt"><strong>${esc(approvalTitles[id] ?? '새 나눔지')}</strong><span>배포됨 · ${(approvals[id] ?? []).map((c) => esc(names[c] ?? c)).join(', ')} · 1~2분 뒤 공동체 화면에 나타나요</span></span>
+            <div class="chips"><button type="button" class="chip pull" data-pull-fresh="${id}">거둬들이기</button></div></li>`).join('')}
+          ${mineItems.map((it) => {
           const s = status(it);
           const pullable = (approvals[it.id] ?? []).some((c) => mine.includes(c));
           return `<li class="item-card">
             <button type="button" class="item-open" data-open="${it.id}">
-              <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span></span>
+              <span class="txt"><strong>${esc(it.title)}</strong><span>${esc(it.passage)} · ${esc(it.date)}</span><span class="st ${s.on ? 'on' : ''}">${esc(s.label)}</span></span>
             </button>
             <div class="chips">
-              <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span>
-              ${pullable ? `<button type="button" class="chip pull" data-pull="${it.id}">거둬들이기</button>` : ''}
+              <button type="button" class="chip" data-open="${it.id}">검토하기</button>
+              ${pullable ? `<button type="button" class="chip pull" data-pull="${it.id}">거둬들이기</button>` : `<button type="button" class="chip on" data-open="${it.id}">배포하기</button>`}
             </div></li>`;
-        }).join('') || (mine.length ? '<li class="empty">검수할 나눔지가 없어요</li>' : '')}</ul>
+        }).join('') || (mine.length && !freshItems.length ? '<li class="empty">아직 나눔지가 없어요</li>' : '')}</ul>
         <ul class="menu">
           <li><button type="button" data-qr><span>QR 내려받기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 만들기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
@@ -175,6 +182,10 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
     view.querySelectorAll<HTMLElement>('[data-pull]').forEach((b) => (b.onclick = () => pullScreen(items.find((i) => i.id === b.dataset.pull)!)));
+    view.querySelectorAll<HTMLElement>('[data-pull-fresh]').forEach((b) => (b.onclick = () => {
+      const id = b.dataset.pullFresh!;
+      pullScreen({ id, title: approvalTitles[id] ?? '이 나눔지' } as Item);
+    }));
     view.querySelector<HTMLElement>('[data-new-community]')!.onclick = () => createScreen();
     const ed = view.querySelector<HTMLElement>('[data-edit-community]'); if (ed) ed.onclick = chooseEdit;
     view.querySelector<HTMLElement>('[data-qr]')!.onclick = qrScreen;
@@ -820,7 +831,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     const id = `shared__${slug}`;
     try {
       for (const c of cs) await setDoc(doc(db, 'approvals', `${id}~${c}`), { gbs: id, community: c, title: g.title, by: user!.email, at: serverTimestamp() });
-      approvals[id] = cs;
+      approvals[id] = cs; approvalTitles[id] = g.title;
     } catch (e) { console.warn('approve', e); toast('사이트에 올렸어요. 배포 표시는 검수 목록에서 다시 해 주세요'); }
     doneScreen({ id, slug, title: g.title, passage: g.passage } as Item, cs, true);
   }
@@ -919,6 +930,7 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
     } catch { mine = []; registered = false; }
     if (!registered) return signupStart();
     try { approvals = await loadApprovals(); } catch { approvals = {}; }
+    try { (await getDocs(collection(db, 'approvals'))).forEach((x) => { const v = x.data() as any; if (v.title) approvalTitles[v.gbs] = v.title; }); } catch {}
     if (isAdmin) {
       // 새 신청이 들어오면 바로 숫자가 바뀌어요
       onSnapshot(collection(db, 'staffRequests'), (q) => { pendingStaff = q.size; if (onList) listScreen(); }, (e) => console.warn('staffRequests', e));
@@ -1043,6 +1055,8 @@ const info = Object.fromEntries(communities.map((c) => [c.slug, { name: c.mainNa
   .staff .q-ed .tag { width: fit-content; min-width: 7em; max-width: 60%; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; border: 0; }
   .staff .q-ed .field, .staff .dv-ed .field { background: var(--bg); }
   .staff .dv-top { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
+  .staff .item-card .st { font-size: .8rem; font-weight: 700; color: var(--faint); }
+  .staff .item-card .st.on { color: var(--accent); }
   .staff .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: .72rem; font-weight: 800; vertical-align: 2px; }
   .staff .section-label { margin: 22px 4px 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
   .staff .item-card.draft .txt { display: grid; gap: 2px; padding: 4px 0; }
