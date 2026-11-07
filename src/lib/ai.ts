@@ -77,10 +77,13 @@ async function readStream(res: Response, onProgress?: (chars: number) => void): 
 }
 
 /** 나눔지를 만들어요. id 는 서버에 잠시 보관된 초안 번호예요 (Firebase 서버일 때만). */
-export async function makeGbs(text: string, communities: string[], note: string, onProgress?: (chars: number) => void): Promise<{ gbs: MadeGbs; id?: string }> {
-  if (BASE) return { gbs: await readStream(await post('/make', { text, communities, note }), onProgress) };
+export async function makeGbs(text: string, communities: string[], note: string, onProgress?: (chars: number) => void, pdf?: string): Promise<{ gbs: MadeGbs; id?: string }> {
+  if (BASE) {
+    if (pdf) throw new SumimError('이 서버에서는 PDF를 그대로 보낼 수 없어요. 내용을 복사해 붙여 넣어 주세요.');
+    return { gbs: await readStream(await post('/make', { text, communities, note }), onProgress) };
+  }
   const call = httpsCallable<object, { gbs: MadeGbs; id: string }>(fns, 'makeGbs', { timeout: 540_000 });
-  return (await call({ text, communities, note })).data;
+  return (await call({ text: pdf ? '' : text, communities, note, ...(pdf ? { pdf } : {}) })).data;
 }
 
 export async function submitGbs(gbs: MadeGbs, communities: string[], draftId?: string): Promise<string> {

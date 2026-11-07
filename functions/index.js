@@ -11,7 +11,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import Anthropic from '@anthropic-ai/sdk';
-import { outputFormat, Submit, buildSystem, userMessage, toMarkdown, commitGbs } from './core.js';
+import { outputFormat, Submit, buildSystem, userContent, toMarkdown, commitGbs } from './core.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
 initializeApp();
@@ -60,9 +60,13 @@ async function mockGbs() {
 }
 
 export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 540, memory: '512MiB' }, async (req) => {
-  const { text, communities, note } = req.data ?? {};
+  const { text, communities, note, pdf } = req.data ?? {};
   const email = await checkStaff(req, communities);
-  if (typeof text !== 'string' || text.trim().length < 200 || text.length > 60000)
+  // 원고는 글자(text) 또는 PDF 파일(pdf, base64) 중 하나로 받아요
+  const usePdf = typeof pdf === 'string' && pdf.length > 0;
+  if (usePdf) {
+    if (pdf.length > 11_000_000 || !pdf.startsWith('JVBER')) throw new HttpsError('invalid-argument', 'PDF 파일이 너무 크거나 PDF가 아니에요. 8MB 이하의 PDF를 올려 주세요.');
+  } else if (typeof text !== 'string' || text.trim().length < 200 || text.length > 60000)
     throw new HttpsError('invalid-argument', '원고는 200자에서 60,000자 사이로 넣어 주세요.');
   if (note != null && (typeof note !== 'string' || note.length > 1000)) throw new HttpsError('invalid-argument', '바라는 점은 1,000자까지 적어 주세요.');
   await countUse(email);
@@ -83,7 +87,7 @@ export const makeGbs = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSe
   }
 
   const client = new Anthropic({ apiKey: key });
-  const user = userMessage(text, note);
+  const user = userContent(text, note, usePdf ? pdf : null);
   try {
     const stream = client.messages.stream({
       model: 'claude-opus-5-5',

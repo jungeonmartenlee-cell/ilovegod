@@ -66,6 +66,14 @@ export const buildSystem = (EXAMPLE) => `당신은 한국 교회 청년 공동�
 ${EXAMPLE}
 </example>`;
 
+/** 스밈에게 보내는 메시지 — PDF 를 그대로 보낼 때는 문서와 안내를 함께 보내요 */
+export const userContent = (text, note, pdf) => pdf
+  ? [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf } },
+      { type: 'text', text: `${note ? `교역자가 바라는 점: ${note}\n\n` : ''}위 PDF는 설교 원고입니다. 이 설교 원고로 나눔지를 만들어 주세요.` },
+    ]
+  : userMessage(text, note);
+
 /** 스밈에게 보내는 메시지 */
 export const userMessage = (text, note) => [
   note ? `교역자가 바라는 점: ${note}\n` : '',
