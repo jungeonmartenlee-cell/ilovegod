@@ -1,0 +1,112 @@
+---
+// 교역자 안내 — 스밈으로 나눔지 만드는 법 (주소: /guide)
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="스밈 안내" description="설교 원고를 올리면 AI 스밈이 1분 만에 소그룹 나눔지를 만들어요.">
+  <section class="hero reveal">
+    <p class="eyebrow">교역자를 위한 스밈</p>
+    <h1>설교 원고 올리고<br /><span class="accent">1분,</span> 나눔지 완성</h1>
+    <p class="sub">원고만 올리면 AI 스밈이<br />소그룹 나눔지를 만들어요.</p>
+    <a class="btn big" href="/staff">지금 시작하기</a>
+  </section>
+
+  <section class="flow">
+    <h2 class="reveal">딱 세 단계예요</h2>
+    <ol>
+      <li class="reveal">
+        <span class="num">1</span>
+        <div><strong>설교문 올리기</strong><p>PDF·워드 파일을 고르거나 붙여 넣으면 끝.<br />설교자와 예배도 스밈이 찾아 적어요.</p></div>
+      </li>
+      <li class="reveal">
+        <span class="num">2</span>
+        <div><strong>검수하기</strong><p>요약·질문·묵상·기도를 한 화면씩 넘기며<br />확인만 하면 돼요.</p></div>
+      </li>
+      <li class="reveal">
+        <span class="num">3</span>
+        <div><strong>나눔지 완성</strong><p>맡은 공동체에 바로 배포하고<br />QR로 성도들에게 전해요.</p></div>
+      </li>
+    </ol>
+    <div class="timer reveal">
+      <div class="bar"><span></span></div>
+      <p><b>만드는 시간 약 1분</b> · 기다리지 않고 다른 일을 해도 돼요</p>
+    </div>
+  </section>
+
+  <section class="inside">
+    <h2 class="reveal">이렇게 만들어져요</h2>
+    <div class="chips reveal">
+      <span>3줄 요약</span><span>핵심 구절</span><span>설교 흐름</span><span>나눔 질문 5개</span><span>5일 묵상</span><span>함께 드리는 기도</span><span>소그룹 나눔방</span>
+    </div>
+  </section>
+
+  <section class="trust">
+    <h2 class="reveal">안심하고 쓰세요</h2>
+    <ul>
+      <li class="reveal"><strong>원고는 저장하지 않아요</strong><span>나눔지를 만드는 데에만 쓰고, 운영자도 볼 수 없어요.</span></li>
+      <li class="reveal"><strong>AI 학습에 쓰이지 않아요</strong><span>보낸 원고는 AI를 가르치는 데 쓰이지 않아요.</span></li>
+      <li class="reveal"><strong>검수한 뒤에만 공개돼요</strong><span>교역자가 확인하고 배포해야 성도들에게 보여요.</span></li>
+    </ul>
+  </section>
+
+  <section class="end reveal">
+    <h2>이번 주 나눔지,<br />지금 만들어 보세요</h2>
+    <a class="btn big" href="/staff">구글 계정으로 시작하기</a>
+    <p class="muted small">처음이시면 등록 신청 후 운영자 승인을 받으면 바로 쓸 수 있어요.</p>
+  </section>
+</BaseLayout>
+
+<script>
+  // 내려가며 하나씩 부드럽게 나타나요 (동작 줄이기를 켠 기기에서는 바로 보여요)
+  const els = document.querySelectorAll<HTMLElement>('.reveal');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+    els.forEach((e) => e.classList.add('on'));
+  } else {
+    const io = new IntersectionObserver((list) => list.forEach((x) => { if (x.isIntersecting) { x.target.classList.add('on'); io.unobserve(x.target); } }), { threshold: 0.15 });
+    els.forEach((e) => io.observe(e));
+  }
+</script>
+
+<style>
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2, .7, .2, 1); }
+  .reveal.on { opacity: 1; transform: none; }
+
+  section { padding: 44px 0; }
+  h2 { margin: 0 0 20px; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.3; }
+
+  .hero { padding-top: 40px; text-align: center; }
+  .eyebrow { margin: 0 0 12px; font-size: .9rem; font-weight: 700; color: var(--accent); }
+  .hero h1 { margin: 0; font-size: clamp(2.1rem, 9vw, 3rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.22; }
+  .accent { color: var(--accent); }
+  .sub { margin: 16px 0 28px; font-size: 1.08rem; line-height: 1.6; color: var(--muted); }
+  .btn.big { display: block; width: 100%; max-width: 360px; margin: 0 auto; padding: 18px; font-size: 1.05rem; text-align: center; }
+
+  .flow ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .flow li { display: flex; gap: 16px; align-items: flex-start; padding: 22px 20px; border-radius: 24px; background: var(--card); border: 0.5px solid var(--line); }
+  .num { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; }
+  .flow strong { display: block; font-size: 1.2rem; letter-spacing: -0.02em; }
+  .flow p { margin: 6px 0 0; font-size: .95rem; line-height: 1.6; color: var(--muted); }
+  .flow li:nth-child(2) { transition-delay: .08s; }
+  .flow li:nth-child(3) { transition-delay: .16s; }
+
+  .timer { margin-top: 22px; }
+  .bar { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .bar span { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--accent); }
+  .timer.on .bar span { animation: fill 1.6s cubic-bezier(.3, .7, .2, 1) .2s forwards; }
+  @keyframes fill { to { width: 100%; } }
+  .timer p { margin: 10px 2px 0; font-size: .9rem; color: var(--muted); }
+  .timer b { color: var(--text); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips span { padding: 10px 16px; border-radius: 999px; background: var(--card); border: 0.5px solid var(--line); font-size: .95rem; font-weight: 600; }
+
+  .trust ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; border-radius: 24px; overflow: hidden; background: var(--line); }
+  .trust li { display: grid; gap: 4px; padding: 20px; background: var(--card); }
+  .trust strong { font-size: 1.05rem; }
+  .trust span { font-size: .92rem; color: var(--muted); line-height: 1.55; }
+
+  .end { text-align: center; padding-bottom: 20px; }
+  .end h2 { margin-bottom: 24px; }
+  .end .small { margin-top: 14px; font-size: .85rem; }
+
+  @media (prefers-reduced-motion: reduce) { .timer .bar span { width: 100%; } }
+</style>

@@ -109,9 +109,10 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   // ── 1. 로그인
   function loginScreen() {
     frame({
-      body: `<h1 class="big-title">교역자 검수</h1>
-        <p class="lead">설교 원고로 만든 나눔지를 확인하고,<br />맡은 공동체에 배포해요.</p>
-        <div class="note">교역자로 등록된 구글 계정만 들어올 수 있어요.</div>`,
+      body: `<h1 class="big-title">교역자</h1>
+        <p class="lead">설교 원고를 올리면 스밈이 1분 만에 나눔지를 만들어요.<br />확인하고 맡은 공동체에 배포하면 끝이에요.</p>
+        <div class="note">처음이시면 구글 계정으로 시작해 등록 신청을 해 주세요. 운영자가 승인하면 바로 쓸 수 있어요.</div>
+        <p class="lead small center" style="margin-top:18px"><a href="/guide" class="inline-link">처음이신가요? 1분 안내 보기</a></p>`,
       primary: ['구글 계정으로 시작하기', () => busy(login)],
     });
   }
@@ -137,8 +138,12 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       title: '',
       body: `<p class="eyebrow">${esc(user!.email!)}</p>
         ${mine.length ? `<h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
-        <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')} <button type="button" class="inline-link" data-mine-qr>공동체 QR</button></p>` : `<h1 class="big-title">환영해요!<br />아직 맡은 공동체가 없어요</h1>
-        <p class="lead">섬기는 공동체를 새로 시작하신다면 <b>새 공동체 개설 신청</b>을 해 주세요. 운영자가 공동체를 열면 여기서 나눔지를 만들 수 있어요. 이미 있는 공동체라면 운영자에게 연결을 요청해 주세요.</p>`}
+        <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')} <button type="button" class="inline-link" data-mine-qr>공동체 QR</button></p>` : `<h1 class="big-title">환영해요!<br />이렇게 시작해 보세요</h1>
+        <ol class="start-steps">
+          <li><b>1</b><span><strong>설교 원고로 나눔지 만들기</strong><small>원고만 올리면 스밈이 1분 안팎으로 만들어요</small></span></li>
+          <li><b>2</b><span><strong>배포할 공동체 개설 신청</strong><small>이미 있는 공동체라면 운영자에게 연결을 요청해 주세요</small></span></li>
+          <li><b>3</b><span><strong>공동체에 배포하고 QR 전달</strong><small>만든 나눔지는 30일 동안 보관돼요</small></span></li>
+        </ol>`}
         ${draftsHtml()}
         <ul class="rows">${mineItems.map((it) => {
           const s = status(it);
@@ -163,7 +168,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
             <li><button type="button" data-staff-admin><span>교역자 관리${pendingStaff ? ` <b class="badge">${pendingStaff}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
             <li><button type="button" data-requests><span>공동체 개설 신청 확인${pendingCommunity ? ` <b class="badge">${pendingCommunity}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           </ul></div>` : ''}`,
-      primary: mine.length ? ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })] : ['새 공동체 개설 신청', () => newCommunity(0, {})],
+      primary: ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })],
       secondary: ['로그아웃', () => signOut(auth)],
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
@@ -186,7 +191,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       const t = d.gbs?.title ? esc(d.gbs.title) : '새 나눔지';
       if (d.status === 'ready') return `<li class="item-card draft ready"><button type="button" class="item-open" data-draft="${d.id}">
           <span class="txt"><strong>${t}</strong><span>${esc(d.gbs?.passage ?? '')} · 다 만들었어요</span></span></button>
-          <div class="chips"><button type="button" class="chip on" data-draft="${d.id}">확인하고 올리기</button><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
+          <div class="chips"><button type="button" class="chip on" data-draft="${d.id}">${mine.length ? '확인하고 올리기' : '나눔지 보기'}</button><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
       if (d.status === 'failed' || stuck(d)) return `<li class="item-card draft"><span class="txt"><strong>만들지 못했어요</strong><span>${esc(d.error ?? '원고를 다시 올려 주세요.')}</span></span>
           <div class="chips"><button type="button" class="chip" data-drop="${d.id}">지우기</button></div></li>`;
       return `<li class="item-card draft"><span class="txt"><strong><span class="dot"></span>스밈이 만들고 있어요</strong><span>${ago(d)} 시작 · 다 되면 여기서 확인할 수 있어요</span></span></li>`;
@@ -599,7 +604,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
       };
     }
     if (step === 1) {
-      if (mine.length === 1) return go(2, { communities: [...mine] });
+      if (mine.length <= 1) return go(2, { communities: [...mine] });
       frame({ ...common, body: `<h2 class="screen-title">어느 공동체의 나눔지로 만들까요?</h2><p class="lead">맡은 공동체 중에서 골라 주세요.</p>
         <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" ${(d.communities ?? []).includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
         <p class="field-error" hidden></p>`,
@@ -614,7 +619,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         const note = view.querySelector<HTMLTextAreaElement>('.field')?.value.trim() ?? '';
         generate({ ...d, note });
       };
-      frame({ ...common, back: () => (mine.length === 1 ? go(0) : go(1)), body: `<h2 class="screen-title">나눔지에 바라는 점이 있나요?</h2>
+      frame({ ...common, back: () => (mine.length <= 1 ? go(0) : go(1)), body: `<h2 class="screen-title">나눔지에 바라는 점이 있나요?</h2>
         <p class="lead">강조할 내용, 적용 찬양 등을 적어 주세요. 없으면 바로 만들어도 돼요.</p>
         <textarea class="memo field" maxlength="1000" placeholder="예: 새가족이 많으니 마음 열기 질문을 쉽게 해 주세요">${esc(d.note ?? '')}</textarea>`,
         primary: ['나눔지 만들기', ask] });
@@ -686,8 +691,45 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     }
   }
 
+  function pickForDraft(d: Sermon) {
+    frame({ title: '설교 원고 올리기', back: listScreen, body: `<h2 class="screen-title">어느 공동체에 올릴까요?</h2>
+        <ul class="checks">${mine.map((c) => `<li><label><input type="checkbox" value="${c}" /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
+        <p class="field-error" hidden></p>`,
+      primary: ['다음', () => {
+        const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
+        if (!picked.length) return fieldError('공동체를 하나 이상 골라 주세요');
+        confirmSermon({ ...d, communities: picked });
+      }] });
+  }
+  // 공동체가 아직 없는 교역자: 완성된 나눔지 미리 보기 → 공동체 개설 안내
+  function previewDraft(d: Sermon) {
+    const g = d.gbs!;
+    const li = (xs: string[]) => xs.map((x) => `<li>${esc(x)}</li>`).join('');
+    frame({ title: '나눔지 미리 보기', back: listScreen,
+      body: `<div class="done-mark small"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></div>
+        <h1 class="big-title center">나눔지가 완성됐어요</h1>
+        <p class="lead center">${esc(g.title)} · ${esc(g.passage)}${g.preacher ? ` · ${esc(g.preacher)}` : ''}</p>
+        <div class="pv">
+          <div class="preview-card col"><span class="sub">핵심 메시지</span><strong class="key">${esc(g.key)}</strong></div>
+          <h3>3줄 요약</h3><ol>${li(g.summary)}</ol>
+          <h3>나눔 질문</h3><ol>${g.share.questions.map((q) => `<li><b>${esc(q.tag)}</b> ${esc(q.text)}</li>`).join('')}</ol>
+          <h3>5일 묵상</h3><ol>${g.devotions.map((v) => `<li><b>${esc(v.ref)}</b> ${esc(v.title)}</li>`).join('')}</ol>
+          <h3>함께 드리는 기도</h3><ol>${li(g.prayers)}</ol>
+        </div>
+        <div class="note">이 나눔지를 성도들에게 보내려면 <b>배포할 공동체</b>가 필요해요. 공동체가 열리면 첫 화면의 '스밈이 만든 나눔지'에서 바로 올릴 수 있어요. (30일 동안 보관돼요)</div>`,
+      primary: ['배포할 공동체 개설 신청', () => newCommunity(0, {})],
+      secondary: ['첫 화면으로', listScreen] });
+  }
+
   // 나눔지에 적힌 설교 정보 확인 — 원고에서 못 찾은 칸만 채우면 돼요
   function confirmSermon(d: Sermon) {
+    // 아직 공동체가 없으면: 만든 나눔지를 먼저 보여 주고, 공동체 개설로 안내해요
+    if (!mine.length) return previewDraft(d);
+    // 공동체 없이 만든 초안을 올릴 때: 배포할 공동체를 골라요
+    if (!d.communities?.length) {
+      if (mine.length === 1) d = { ...d, communities: [...mine] };
+      else return pickForDraft(d);
+    }
     const g = d.gbs!;
     const field = (key: 'title' | 'passage' | 'preacher' | 'date' | 'service', label: string, ph: string, type = 'text') =>
       `<label class="kv-field"><span>${label}</span><input class="field" data-k="${key}" type="${type}" maxlength="${key === 'service' || key === 'preacher' ? 40 : 80}" placeholder="${ph}" value="${esc(g[key] ?? '')}" /></label>`;
@@ -910,6 +952,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .qr-pop .text-btn { border: 0; background: none; font: inherit; font-size: .9rem; font-weight: 600; color: var(--muted); padding: 6px; cursor: pointer; }
   .qr-x { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--surface-2); cursor: pointer; z-index: 1; }
   .qr-x svg { width: 15px; height: 15px; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+  .staff a.inline-link { text-decoration: none; display: inline-block; padding: 6px 14px; }
   .staff .inline-link { margin-left: 6px; padding: 2px 10px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; vertical-align: 1px; }
   .staff .share-qr-row { display: flex; justify-content: center; margin-top: 22px; }
   .staff .qr-cta { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border: 0.5px solid var(--line); border-radius: 20px; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
@@ -921,6 +964,19 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .admin-label svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linejoin: round; }
   .staff .menu.admin { margin-top: 0; border: 1px solid var(--accent); background: var(--accent-soft); }
   .staff .menu.admin li + li { border-top-color: rgba(243, 112, 33, .25); }
+  .staff .start-steps { list-style: none; display: grid; gap: 10px; margin: 18px 0 8px; padding: 0; }
+  .staff .start-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: 20px; background: var(--card); border: 0.5px solid var(--line); }
+  .staff .start-steps li:first-child { border: 1px solid var(--accent); }
+  .staff .start-steps b { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .85rem; }
+  .staff .start-steps li:not(:first-child) b { background: var(--surface-2); color: var(--muted); }
+  .staff .start-steps span { display: grid; gap: 2px; }
+  .staff .start-steps small { font-size: .82rem; color: var(--muted); }
+  .staff .done-mark.small { width: 56px; height: 56px; margin-top: 20px; }
+  .staff .done-mark.small svg { width: 28px; height: 28px; }
+  .staff .pv { margin: 18px 0; }
+  .staff .pv h3 { margin: 22px 4px 8px; font-size: .85rem; color: var(--muted); }
+  .staff .pv ol { margin: 0; padding: 14px 18px 14px 34px; border-radius: 18px; background: var(--card); display: grid; gap: 8px; font-size: .92rem; line-height: 1.6; }
+  .staff .pv ol b { color: var(--accent); margin-right: 4px; }
   .staff .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: .72rem; font-weight: 800; vertical-align: 2px; }
   .staff .section-label { margin: 22px 4px 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
   .staff .item-card.draft .txt { display: grid; gap: 2px; padding: 4px 0; }
