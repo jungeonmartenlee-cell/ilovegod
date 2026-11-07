@@ -25,7 +25,12 @@ class SumimError extends Error {}
 /** 서버가 보낸 안내 문구 (없으면 기본 문구) */
 export const aiError = (e: unknown, fallback: string) => {
   if (e instanceof SumimError) return e.message;
-  return e instanceof FunctionsError && e.code !== 'internal' && e.message && !/^[a-z-]+$/.test(e.message) ? e.message : fallback;
+  if (e instanceof FunctionsError) {
+    const code = String(e.code).replace('functions/', '');
+    if (code !== 'internal' && e.message && !/^[a-z-]+$/.test(e.message)) return e.message;
+    return `${fallback} (${code})`;
+  }
+  return fallback;
 };
 
 async function post(path: string, body: object): Promise<Response> {
