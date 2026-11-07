@@ -71,7 +71,8 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   let back: (() => void) | null = null;
   let onList = false;                 // 첫 화면(목록)을 보고 있는지
   let registered = false;            // staff 문서가 있는지 (승인된 교역자)
-  let pendingStaff = 0;               // 운영자: 기다리는 교역자 등록 신청 수
+  let pendingStaff = 0;
+  let pendingCommunity = 0;          // 운영자: 기다리는 공동체 개설 신청 수               // 운영자: 기다리는 교역자 등록 신청 수
   let onMaking = false;               // '만들고 있어요' 화면을 보고 있는지
   type Draft = { id: string; status: 'making' | 'ready' | 'failed'; gbs?: MadeGbs; communities: string[]; error?: string; at?: any };
   let drafts: Draft[] = [];
@@ -154,9 +155,14 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         <ul class="menu">
           <li><button type="button" data-qr><span>QR 내려받기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
-          ${isAdmin ? `<li><button type="button" data-staff-admin><span>교역자 관리${pendingStaff ? ` <b class="badge">${pendingStaff}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>` : ''}
-          <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
-        </ul>`,
+          ${isAdmin ? '' : `<li><button type="button" data-requests><span>내 개설 신청 보기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>`}
+        </ul>
+        ${isAdmin ? `<div class="admin-zone">
+          <p class="admin-label"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" /></svg>운영자 전용 · 운영자에게만 보여요</p>
+          <ul class="menu admin">
+            <li><button type="button" data-staff-admin><span>교역자 관리${pendingStaff ? ` <b class="badge">${pendingStaff}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
+            <li><button type="button" data-requests><span>공동체 개설 신청 확인${pendingCommunity ? ` <b class="badge">${pendingCommunity}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
+          </ul></div>` : ''}`,
       primary: mine.length ? ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })] : ['새 공동체 개설 신청', () => newCommunity(0, {})],
       secondary: ['로그아웃', () => signOut(auth)],
     });
@@ -818,7 +824,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     } catch { mine = []; registered = false; }
     if (!registered) return signupStart();
     try { approvals = await loadApprovals(); } catch { approvals = {}; }
-    if (isAdmin) { try { pendingStaff = (await getDocs(collection(db, 'staffRequests'))).size; } catch {} }
+    if (isAdmin) {
+      // 새 신청이 들어오면 바로 숫자가 바뀌어요
+      onSnapshot(collection(db, 'staffRequests'), (q) => { pendingStaff = q.size; if (onList) listScreen(); }, (e) => console.warn('staffRequests', e));
+      onSnapshot(query(collection(db, 'communityRequests'), where('status', '==', 'pending')), (q) => { pendingCommunity = q.size; if (onList) listScreen(); }, (e) => console.warn('communityRequests', e));
+    }
     watchDrafts();
     listScreen();
   });
@@ -906,6 +916,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   .staff .qr-cta svg { width: 34px; height: 34px; flex: none; fill: var(--accent); }
   .staff .qr-cta span { display: grid; gap: 2px; }
   .staff .qr-cta small { font-size: .82rem; color: var(--muted); }
+  .staff .admin-zone { margin-top: 40px; padding-top: 22px; border-top: 1px dashed var(--line); }
+  .staff .admin-label { display: flex; align-items: center; gap: 6px; margin: 0 4px 10px; font-size: .78rem; font-weight: 700; color: var(--accent); }
+  .staff .admin-label svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linejoin: round; }
+  .staff .menu.admin { margin-top: 0; border: 1px solid var(--accent); background: var(--accent-soft); }
+  .staff .menu.admin li + li { border-top-color: rgba(243, 112, 33, .25); }
   .staff .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: .72rem; font-weight: 800; vertical-align: 2px; }
   .staff .section-label { margin: 22px 4px 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
   .staff .item-card.draft .txt { display: grid; gap: 2px; padding: 4px 0; }
