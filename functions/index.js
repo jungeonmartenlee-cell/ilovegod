@@ -232,6 +232,7 @@ export const createCommunity = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY, GH
 const Worship = z.object({ label: z.string().max(20), time: z.string().max(40), place: z.string().max(60) });
 const CommunityEdit = z.object({
   name: z.string().trim().min(1).max(20),
+  parents: z.string().trim().max(60).default(''),
   tagline: z.string().trim().max(60),
   intro: z.string().trim().max(400),
   worship: z.array(Worship).max(6),
@@ -243,7 +244,7 @@ export const saveCommunity = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSecon
   const p = CommunityEdit.safeParse(req.data?.edit);
   if (!p.success) throw new HttpsError('invalid-argument', '글자 수를 확인해 주세요.');
   const e = p.data;
-  const edit = { name: e.name, tagline: e.tagline, intro: e.intro, worship: e.worship.filter((w) => w.label || w.time || w.place) };
+  const edit = { name: e.name, parents: e.parents, tagline: e.tagline, intro: e.intro, worship: e.worship.filter((w) => w.label || w.time || w.place) };
   const text = JSON.stringify(edit, null, 2) + '\n';
   const token = GH_TOKEN.value();
   try {
