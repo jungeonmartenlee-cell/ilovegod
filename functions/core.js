@@ -116,7 +116,7 @@ export async function commitGbs(token, md, { date, title, email }) {
     const name = n === 1 ? date : `${date}-${n}`;
     const res = await gh(token, `${DIR}/${name}.md`, {
       method: 'PUT',
-      body: JSON.stringify({ message: `나눔지 올림: ${title} (${email})`, content: b64, branch: BRANCH }),
+      body: JSON.stringify({ message: `나눔지 올림: ${title}`, content: b64, branch: BRANCH }),
     });
     if (res.status === 201) return name;
     if (res.status === 422) continue;          // 같은 날짜 파일이 이미 있어요
@@ -125,3 +125,44 @@ export async function commitGbs(token, md, { date, title, email }) {
   throw new Error('too many files');
 }
 export { parse as parseYaml } from 'yaml';
+
+// ── 공동체 파일 (GitHub) ─────────────────────────────────────
+const b64 = (s) => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+/** 파일이 있으면 { sha, text }, 없으면 null */
+export async function readRepoFile(token, path) {
+  const r = await gh(token, path);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`github ${r.status}`);
+  const j = await r.json();
+  return { sha: j.sha, text: new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g, '')), (c) => c.charCodeAt(0))) };
+}
+/** 파일을 만들거나 고쳐요 (sha 가 있으면 고치기) */
+export async function writeRepoFile(token, path, text, message, sha) {
+  const r = await gh(token, path, { method: 'PUT', body: JSON.stringify({ message, content: b64(text), branch: BRANCH, ...(sha ? { sha } : {}) }) });
+  if (r.status !== 200 && r.status !== 201) throw new Error(`github ${r.status}`);
+}
+
+/** 한글 이름을 로마자로 (국어의 로마자 표기법을 간단히) — 스밈이 주소를 못 정할 때 씀 */
+export function romanize(name) {
+  name = name.replace(/\s*(공동체|청년부|청년회|청년|공동|모임|팀)$/u, '') || name;
+  const I = ['g', 'kk', 'n', 'd', 'tt', 'r', 'm', 'b', 'pp', 's', 'ss', '', 'j', 'jj', 'ch', 'k', 't', 'p', 'h'];
+  // 샤·쇼·슈 처럼 ㅅ+ㅑ/ㅕ/ㅛ/ㅠ 는 sh 로 (샬롬 → shallom 이 아니라 shalom 에 가깝게)
+  const V = ['a', 'ae', 'ya', 'yae', 'eo', 'e', 'yeo', 'ye', 'o', 'wa', 'wae', 'oe', 'yo', 'u', 'wo', 'we', 'wi', 'yu', 'eu', 'ui', 'i'];
+  const F = ['', 'k', 'k', 'k', 'n', 'n', 'n', 't', 'l', 'k', 'm', 'l', 'l', 'l', 'p', 'l', 'm', 'p', 'p', 't', 't', 'ng', 't', 't', 'k', 't', 'p', 't'];
+  let out = '';
+  for (const ch of name) {
+    const c = ch.charCodeAt(0) - 0xac00;
+    if (c >= 0 && c < 11172) {
+      let i = I[Math.floor(c / 588)], v = V[Math.floor((c % 588) / 28)];
+      if (i === 's' && /^y/.test(v)) { i = 'sh'; v = v.slice(1); }
+      const f = F[c % 28];
+      out += (out.endsWith('l') && i === 'r' ? 'l' : i) + v + f;
+    }
+    else if (/[a-z0-9]/i.test(ch)) out += ch.toLowerCase();
+    else if (/\s|-/.test(ch)) out += '-';
+  }
+  return out.replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 20);
+}
+/** 주소로 쓸 수 없는 이름 (사이트의 다른 페이지와 겹쳐요) */
+export const RESERVED = new Set(['staff', 'guide', 'privacy', 'terms', 'gbs', 'qr', 'api', 'admin', 'index', 'images', 'pdfjs', 'favicon', '404', 'types', 'edits', 'about', 'share', 'login']);
+export const SLUG_RE = /^[a-z][a-z0-9-]{1,19}$/;

@@ -11,7 +11,9 @@ import { defineSecret } from 'firebase-functions/params';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import Anthropic from '@anthropic-ai/sdk';
-import { outputFormat, Submit, buildSystem, userContent, toMarkdown, commitGbs } from './core.js';
+import { outputFormat, Submit, buildSystem, userContent, toMarkdown, commitGbs, readRepoFile, writeRepoFile, romanize, RESERVED, SLUG_RE } from './core.js';
+import { z } from 'zod/v4';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 
 initializeApp();
@@ -167,3 +169,95 @@ async function removeDraft(id, email) {
   const snap = await ref.get();
   if (snap.exists && snap.get('by') === email) await ref.delete();
 }
+
+// ── 공동체 만들기 — 교역자는 이름만 적고, 주소(영어 이름)는 스밈이 정해요
+const COMM_DIR = 'src/communities';
+const cleanName = (v) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ') : '');
+
+async function suggestSlug(name) {
+  try {
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
+    const msg = await client.messages.parse({
+      model: 'claude-haiku-5-5',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: `교회 청년 공동체 이름: "${name}"\n이 공동체의 웹 주소에 쓸 짧은 영어 이름을 하나 정해 주세요. 소문자 영어·숫자·하이픈만, 3~12자. 이름의 소리나 뜻이 잘 드러나고 외우기 쉽게 (예: 하손내빚 → hason, 샬롬 → shalom, GIL → gil).` }],
+      output_config: { format: zodOutputFormat(z.object({ slug: z.string() })) },
+    });
+    const s = String(msg.parsed_output?.slug ?? '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (SLUG_RE.test(s)) return s;
+  } catch (e) { console.error('suggestSlug', String(e?.name)); }
+  return null;
+}
+
+export const createCommunity = onCall({ ...OPTS, secrets: [ANTHROPIC_API_KEY, GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+  const email = await checkStaff(req, [], true);
+  const name = cleanName(req.data?.name);
+  if (name.length < 1 || name.length > 20) throw new HttpsError('invalid-argument', '공동체 이름은 1~20자로 적어 주세요.');
+  const ref = db.doc(`staff/${email}`);
+  const mine = (await ref.get()).get('communities') ?? [];
+  if (mine.length >= 10) throw new HttpsError('resource-exhausted', '공동체는 한 사람이 10개까지 만들 수 있어요.');
+
+  // 주소 정하기 → 겹치면 -2, -3 …
+  let base = (EMULATOR && GH_TOKEN.value() === 'mock') ? romanize(name) : (await suggestSlug(name)) ?? romanize(name);
+  if (!SLUG_RE.test(base)) base = `c${Date.now().toString(36).slice(-6)}`;
+  const token = GH_TOKEN.value();
+  const mock = EMULATOR && token === 'mock';
+  let slug = '';
+  for (let n = 1; n <= 20 && !slug; n++) {
+    const s = n === 1 ? base : `${base.slice(0, 17)}-${n}`;
+    if (RESERVED.has(s)) continue;
+    if (mock) { slug = s; break; }
+    const [ts, js] = await Promise.all([readRepoFile(token, `${COMM_DIR}/${s}.ts`), readRepoFile(token, `${COMM_DIR}/${s}.json`)]);
+    if (!ts && !js) slug = s;
+  }
+  if (!slug) throw new HttpsError('already-exists', '주소를 정하지 못했어요. 다른 이름으로 해 주세요.');
+
+  const file = JSON.stringify({ names: [name], order: 50 }, null, 2) + '\n';
+  try {
+    if (mock) {
+      const dir = process.env.LOCAL_COMMUNITY_DIR ?? '/tmp/community-test';
+      mkdirSync(dir, { recursive: true }); writeFileSync(`${dir}/${slug}.json`, file);
+    } else {
+      await writeRepoFile(token, `${COMM_DIR}/${slug}.json`, file, `공동체 만들기: ${name} (/${slug})`);
+    }
+  } catch (e) {
+    console.error('createCommunity github', String(e?.message));
+    throw new HttpsError('unavailable', '공동체를 만들지 못했어요. 잠시 뒤에 다시 해 주세요.');
+  }
+  await ref.update({ communities: FieldValue.arrayUnion(slug) });
+  return { slug, name };
+});
+
+// ── 공동체 소개 고치기 — 맡은 공동체만 (운영자는 모두)
+const Worship = z.object({ label: z.string().max(20), time: z.string().max(40), place: z.string().max(60) });
+const CommunityEdit = z.object({
+  name: z.string().trim().min(1).max(20),
+  tagline: z.string().trim().max(60),
+  intro: z.string().trim().max(400),
+  worship: z.array(Worship).max(6),
+});
+export const saveCommunity = onCall({ ...OPTS, secrets: [GH_TOKEN], timeoutSeconds: 60 }, async (req) => {
+  const slug = req.data?.slug;
+  if (typeof slug !== 'string' || !SLUG_RE.test(slug)) throw new HttpsError('invalid-argument', '공동체를 확인해 주세요.');
+  const email = await checkStaff(req, [slug]);
+  const p = CommunityEdit.safeParse(req.data?.edit);
+  if (!p.success) throw new HttpsError('invalid-argument', '글자 수를 확인해 주세요.');
+  const e = p.data;
+  const edit = { name: e.name, tagline: e.tagline, intro: e.intro, worship: e.worship.filter((w) => w.label || w.time || w.place) };
+  const text = JSON.stringify(edit, null, 2) + '\n';
+  const token = GH_TOKEN.value();
+  try {
+    if (EMULATOR && token === 'mock') {
+      const dir = (process.env.LOCAL_COMMUNITY_DIR ?? '/tmp/community-test') + '/edits';
+      mkdirSync(dir, { recursive: true }); writeFileSync(`${dir}/${slug}.json`, text);
+      return { ok: true };
+    }
+    const path = `${COMM_DIR}/edits/${slug}.json`;
+    const old = await readRepoFile(token, path);
+    await writeRepoFile(token, path, text, `공동체 소개 고침: ${e.name} (/${slug})`, old?.sha);
+  } catch (err) {
+    console.error('saveCommunity github', String(err?.message));
+    throw new HttpsError('unavailable', '저장하지 못했어요. 잠시 뒤에 다시 해 주세요.');
+  }
+  return { ok: true };
+});

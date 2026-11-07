@@ -17,8 +17,10 @@ interface Props {
   bare?: boolean;
   /** 위쪽 로고 머리글 숨기기 (자체 상단 바를 쓰는 화면) */
   hideHeader?: boolean;
+  /** 이 화면만의 시작 애니메이션 문구 (교역자 화면 등) */
+  intro?: { line1: string; line2: string; id: string };
 }
-const { title, community, bare = false, hideHeader = false } = Astro.props;
+const { title, community, bare = false, hideHeader = false, intro } = Astro.props;
 const description = Astro.props.description
   ?? community?.description
   ?? (community ? `${community.mainName} 소개와 주일 설교 후 소그룹 GBS 나눔 자료` : MAIN.description);
@@ -76,7 +78,7 @@ const fullTitle = title
     <style is:global>body.has-tabbar { --tabbar: 84px; }</style>
   </head>
   <body class:list={[{ 'has-tabbar': community && !bare, bare }]}>
-    {!bare && <Intro />}
+    {intro ? <Intro {...intro} /> : !bare && <Intro />}
     {!hideHeader && <Header community={community} />}
     <main>
       <div class="container">
