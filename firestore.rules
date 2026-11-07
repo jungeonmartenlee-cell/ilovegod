@@ -40,7 +40,7 @@ service cloud.firestore {
       allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['communities', 'name'])
         && request.resource.data.communities is list
-        && request.resource.data.communities.size() > 0 && request.resource.data.communities.size() <= 20
+        && request.resource.data.communities.size() <= 20
         && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 20))
         && (resource == null || resource.data.get('admin', false) == false);
       allow delete: if isAdmin() && resource.data.get('admin', false) == false;

@@ -70,6 +70,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
   let approvals: Record<string, string[]> = {};
   let back: (() => void) | null = null;
   let onList = false;                 // 첫 화면(목록)을 보고 있는지
+  let registered = false;            // staff 문서가 있는지 (승인된 교역자)
   let pendingStaff = 0;               // 운영자: 기다리는 교역자 등록 신청 수
   let onMaking = false;               // '만들고 있어요' 화면을 보고 있는지
   type Draft = { id: string; status: 'making' | 'ready' | 'failed'; gbs?: MadeGbs; communities: string[]; error?: string; at?: any };
@@ -134,8 +135,9 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     frame({
       title: '',
       body: `<p class="eyebrow">${esc(user!.email!)}</p>
-        <h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
-        <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')}</p>
+        ${mine.length ? `<h1 class="big-title">${waiting ? `검수할 나눔지가<br />${waiting}개 있어요` : '모두 검수했어요'}</h1>
+        <p class="lead">맡은 공동체: ${mine.map((c) => esc(names[c] ?? c)).join(', ')}</p>` : `<h1 class="big-title">환영해요!<br />아직 맡은 공동체가 없어요</h1>
+        <p class="lead">섬기는 공동체를 새로 시작하신다면 <b>새 공동체 개설 신청</b>을 해 주세요. 운영자가 공동체를 열면 여기서 나눔지를 만들 수 있어요. 이미 있는 공동체라면 운영자에게 연결을 요청해 주세요.</p>`}
         ${draftsHtml()}
         <ul class="rows">${mineItems.map((it) => {
           const s = status(it);
@@ -148,14 +150,14 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
               <span class="chip ${s.on ? 'on' : ''}">${esc(s.label)}</span>
               ${pullable ? `<button type="button" class="chip pull" data-pull="${it.id}">거둬들이기</button>` : ''}
             </div></li>`;
-        }).join('') || '<li class="empty">검수할 나눔지가 없어요</li>'}</ul>
+        }).join('') || (mine.length ? '<li class="empty">검수할 나눔지가 없어요</li>' : '')}</ul>
         <ul class="menu">
           <li><button type="button" data-qr><span>QR 내려받기</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           <li><button type="button" data-new-community><span>새 공동체 개설 신청</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
           ${isAdmin ? `<li><button type="button" data-staff-admin><span>교역자 관리${pendingStaff ? ` <b class="badge">${pendingStaff}</b>` : ''}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>` : ''}
           <li><button type="button" data-requests><span>${isAdmin ? '개설 신청 확인하기' : '내 개설 신청 보기'}</span>${'<svg viewBox="0 0 8 13"><path d="M1.5 1.5 6.5 6.5 1.5 11.5"/></svg>'}</button></li>
         </ul>`,
-      primary: ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })],
+      primary: mine.length ? ['설교 원고로 나눔지 만들기', () => sermonStep(0, { communities: [...mine] })] : ['새 공동체 개설 신청', () => newCommunity(0, {})],
       secondary: ['로그아웃', () => signOut(auth)],
     });
     view.querySelectorAll<HTMLElement>('[data-open]').forEach((b) => (b.onclick = () => review(items.find((i) => i.id === b.dataset.open)!, 0)));
@@ -275,8 +277,8 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
         primary: ['등록 신청하기', () => go(1)], secondary: ['다른 계정으로 로그인', () => signOut(auth)] });
     }
     if (step === 1) {
-      frame({ ...common, body: `<h2 class="screen-title">이름을 알려 주세요</h2><p class="lead">운영자가 누구인지 알아볼 수 있게 실명으로 적어 주세요.</p>
-        <input class="field one" maxlength="20" placeholder="예: 홍길동 목사" value="${esc(d.name ?? '')}" /><p class="field-error" hidden></p>`,
+      frame({ ...common, body: `<h2 class="screen-title">이름을 알려 주세요</h2><p class="lead">실명과 함께 <b>목사·전도사 등 직책</b>까지 적어 주시면 운영자가 확인하는 데 도움이 돼요.</p>
+        <input class="field one" maxlength="20" placeholder="예: 홍길동 목사, 김하나 전도사" value="${esc(d.name ?? '')}" /><p class="field-error" hidden></p>`,
         primary: ['다음', () => { const v = view.querySelector<HTMLInputElement>('.field')!.value.trim(); if (!v) return fieldError('이름을 적어 주세요'); go(2, { name: v }); }] });
     }
     if (step === 2) {
@@ -292,7 +294,7 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     }
     if (step === 3) {
       const all = Object.keys(names);
-      frame({ ...common, body: `<h2 class="screen-title">어느 공동체를 섬기시나요?</h2><p class="lead">맡으실 공동체를 골라 주세요. 잘 모르시면 고르지 않아도 돼요.</p>
+      frame({ ...common, body: `<h2 class="screen-title">어느 공동체를 섬기시나요?</h2><p class="lead">이미 있는 공동체라면 골라 주세요. 새로 시작하는 공동체라면 고르지 않고 신청한 뒤, 승인되면 <b>새 공동체 개설 신청</b>에서 만들 수 있어요.</p>
         <ul class="checks">${all.map((c) => `<li><label><input type="checkbox" value="${c}" ${(d.communities ?? []).includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>`,
         primary: ['신청하기', () => busy(async () => {
           const communities = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
@@ -355,12 +357,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     const all = Object.keys(names);
     frame({
       title: isNew ? '승인하기' : '공동체 바꾸기', back: staffAdminScreen,
-      body: `<h2 class="screen-title">${esc(r.name)} 님이<br />맡을 공동체를 골라 주세요</h2><p class="lead">${esc(r.id)}</p>
+      body: `<h2 class="screen-title">${esc(r.name)} 님이<br />맡을 공동체를 골라 주세요</h2><p class="lead">${esc(r.id)}<br />새 공동체를 직접 개설할 분이라면 고르지 않고 승인해도 돼요.</p>
         <ul class="checks">${all.map((c) => `<li><label><input type="checkbox" value="${c}" ${(r.communities ?? []).includes(c) ? 'checked' : ''} /><span>${esc(names[c] ?? c)}</span></label></li>`).join('')}</ul>
         <p class="field-error" hidden></p>`,
       primary: [isNew ? '승인하기' : '저장하기', () => {
         const picked = Array.from(view.querySelectorAll<HTMLInputElement>('input:checked')).map((i) => i.value);
-        if (!picked.length) return fieldError('공동체를 하나 이상 골라 주세요');
         busy(async () => {
           await setDoc(doc(db, 'staff', r.id), { communities: picked, name: r.name.slice(0, 20) });
           if (isNew) await deleteDoc(doc(db, 'staffRequests', r.id));   // 전화번호가 담긴 신청서는 지워요
@@ -773,10 +774,11 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     if (!user) return loginScreen();
     try {
       const s = await getDoc(doc(db, 'staff', user.email!));
+      registered = s.exists();
       mine = s.exists() ? (s.data().communities as string[]) ?? [] : [];
       isAdmin = s.exists() && s.data().admin === true;
-    } catch { mine = []; }
-    if (!mine.length) return signupStart();
+    } catch { mine = []; registered = false; }
+    if (!registered) return signupStart();
     try { approvals = await loadApprovals(); } catch { approvals = {}; }
     if (isAdmin) { try { pendingStaff = (await getDocs(collection(db, 'staffRequests'))).size; } catch {} }
     watchDrafts();
