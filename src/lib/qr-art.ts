@@ -4,7 +4,6 @@ import QRCode from 'qrcode';
 
 const HEART = 'M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.2 0 3.7 1.2 5.3 3.1 1.6-1.9 3.1-3.1 5.3-3.1 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z';
 const INK = '#111111';
-const ACCENT = '#f37021';
 
 type Box = { x: number; y: number; w: number; h: number };
 /** label 이 없으면 가운데에 하트를 넣어요 */
@@ -12,8 +11,9 @@ function layout(url: string, label?: string) {
   const qr = QRCode.create(url, { errorCorrectionLevel: 'H' });
   const n = qr.modules.size;
   const odd = (v: number) => (Math.round(v) % 2 === n % 2 ? Math.round(v) : Math.round(v) + 1);
-  const w = label ? odd(n * 0.38) : odd(n * 0.22);
-  const h = label ? odd(n * 0.17) : w;
+  // 가운데 칸: 글자 한 개(공동체 첫 글자) 또는 하트 — 정사각형
+  const w = odd(n * 0.22);
+  const h = w;
   const box: Box = { x: (n - w) / 2, y: (n - h) / 2, w, h };
   const cells: [number, number][] = [];
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
@@ -23,8 +23,10 @@ function layout(url: string, label?: string) {
   }
   return { n, cells, box };
 }
-/** 글자 너비 어림 (한글은 1, 영문·숫자는 0.62) */
-const textUnits = (t: string) => [...t].reduce((s, ch) => s + (/[ㄱ-힝]/.test(ch) ? 1 : ch === ' ' ? 0.3 : 0.64), 0);
+/** 공동체 QR 가운데 글자 — 주소 이름의 첫 영문자 (예: hason → H, gil → G) */
+export const qrInitial = (slug: string) => (slug.match(/[a-z0-9]/i)?.[0] ?? '').toUpperCase();
+// 하트 그림의 실제 범위 (가운데 정렬용)
+const HEART_CX = 12, HEART_CY = 12.75, HEART_W = 22.2;
 
 /** 화면에 넣을 SVG */
 export function qrSvg(url: string, label?: string): string {
@@ -32,13 +34,11 @@ export function qrSvg(url: string, label?: string): string {
   const d = cells.map(([x, y]) => `M${x} ${y}h1v1h-1z`).join('');
   let mid = '';
   if (label) {
-    const fs = box.h * 0.62;
-    const est = textUnits(label) * fs;
-    const fit = est > box.w * 0.9 ? ` textLength="${box.w * 0.9}" lengthAdjust="spacingAndGlyphs"` : '';
-    mid = `<text x="${n / 2}" y="${n / 2}" dy="0.36em" text-anchor="middle" font-size="${fs}" font-weight="800" letter-spacing="-0.02em" fill="${INK}" font-family="Pretendard Variable, Pretendard, -apple-system, sans-serif"${fit}>${label.replace(/[&<>]/g, '')}</text>`;
+    const fs = box.h * 0.8;
+    mid = `<text x="${n / 2}" y="${n / 2}" dy="0.355em" text-anchor="middle" font-size="${fs}" font-weight="800" fill="${INK}" font-family="Pretendard Variable, Pretendard, -apple-system, sans-serif">${label.replace(/[&<>]/g, '')}</text>`;
   } else {
-    const s = box.w / 24 * 0.86;
-    mid = `<path d="${HEART}" fill="${ACCENT}" transform="translate(${box.x + (box.w - 24 * s) / 2} ${box.y + (box.h - 24 * s) / 2 + s}) scale(${s})"/>`;
+    const s = (box.w * 0.84) / HEART_W;
+    mid = `<path d="${HEART}" fill="${INK}" transform="translate(${n / 2 - HEART_CX * s} ${n / 2 - HEART_CY * s}) scale(${s})"/>`;
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="${INK}"/>${mid}</svg>`;
 }
@@ -63,13 +63,17 @@ export async function saveQrPoster(url: string, title: string, label?: string) {
   for (const [x, y] of cells) g.fillRect(Math.floor(ox + x * m), Math.floor(oy + y * m), Math.ceil(m), Math.ceil(m));
   const bx = ox + box.x * m, by = oy + box.y * m, bw = box.w * m, bh = box.h * m;
   if (label) {
-    let lf = bh * 0.62; g.font = `800 ${lf}px ${font}`;
-    while (g.measureText(label).width > bw * 0.9 && lf > 10) { lf -= 2; g.font = `800 ${lf}px ${font}`; }
-    g.fillStyle = INK; g.textBaseline = 'middle'; g.fillText(label, bx + bw / 2, by + bh / 2 + lf * 0.04);
+    // 글자의 실제 크기를 재서 정확히 가운데에 놓아요
+    g.font = `800 ${bh * 0.8}px ${font}`; g.fillStyle = INK; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+    const mt = g.measureText(label);
+    const asc = mt.actualBoundingBoxAscent, desc = mt.actualBoundingBoxDescent;
+    const left = mt.actualBoundingBoxLeft, right = mt.actualBoundingBoxRight;
+    g.fillText(label, bx + bw / 2 - (right - left) / 2 + left, by + bh / 2 + (asc - desc) / 2);
+    g.textAlign = 'center';
   } else {
-    const s = (bw / 24) * 0.86;
-    g.save(); g.translate(bx + (bw - 24 * s) / 2, by + (bh - 24 * s) / 2 + s); g.scale(s, s);
-    g.fillStyle = ACCENT; g.fill(new Path2D(HEART)); g.restore();
+    const s = (bw * 0.84) / HEART_W;
+    g.save(); g.translate(bx + bw / 2 - HEART_CX * s, by + bh / 2 - HEART_CY * s); g.scale(s, s);
+    g.fillStyle = INK; g.fill(new Path2D(HEART)); g.restore();
   }
   // 안내
   g.textBaseline = 'alphabetic';

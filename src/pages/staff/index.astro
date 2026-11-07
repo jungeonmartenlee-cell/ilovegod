@@ -226,12 +226,12 @@ const names = Object.fromEntries(communities.map((c) => [c.slug, c.mainName]));
     const link = (c: string) => `${site}/${c}`;
     const rows: [string, string, string | undefined][] = [
       ['', '하나님을 사랑합니다', undefined],
-      ...mine.map((c) => [c, names[c] ?? c, names[c] ?? c] as [string, string, string]),
+      ...mine.map((c) => [c, names[c] ?? c, (c.match(/[a-z0-9]/i)?.[0] ?? '').toUpperCase()] as [string, string, string]),
     ];
     frame({
       title: 'QR 내려받기', back: listScreen,
       body: `<h1 class="big-title">QR 내려받기</h1>
-        <p class="lead">QR 가운데에 이름이 들어가 있어서 QR만 봐도 어느 공동체인지 알 수 있어요. PPT나 주보에 그대로 넣어 주세요.</p>
+        <p class="lead">QR 가운데에 공동체 첫 글자(예: GIL → G)가, 메인 QR에는 하트가 들어가요. 저장한 이미지 위에는 이름도 크게 들어가니 PPT나 주보에 그대로 넣어 주세요.</p>
         <ul class="rows">${rows.map(([c, title], i) => `<li class="item-card">
           <span class="txt"><strong>${esc(title)}</strong><span>${esc(link(c).replace(/^https?:\/\//, '').replace(/\/$/, ''))}${c ? '' : ' · 메인 화면'}</span></span>
           <div class="chips"><button type="button" class="chip on" data-save-qr="${i}">QR 저장</button>
